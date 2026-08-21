@@ -124,8 +124,23 @@ Backend first, so the operator can be hands-off while the frontend is built.
    produces a working app.
 6. **CI.** Build and deploy on push to `main`.
 
-Scoring in Phase 1 is manual — a SQL script the operator runs, not the
-`score-games` Edge Function. The three scheduled functions are Phase 2.
+Scoring in Phase 1 is manual, but not a loose script: `lock_week`,
+`set_final_score` and `score_week` live in the `private` schema, which
+PostgREST does not expose, so the same functions the operator runs by hand are
+what Phase 2's Edge Functions will call on a timer. The runbook is
+[supabase/OPERATIONS.md](../../../supabase/OPERATIONS.md).
+
+### Status as of 2026-08-21
+
+All six Phase 1 items are built and deployed. Verified in production by a real
+signed-in user: a complete 32-pick entry saved, with `moneyline_correct` and
+`spread_correct` untouched — the column grant held.
+
+What is deliberately still fake: every line is invented and stamped
+`line_source = 'demo'`, kickoff dates are shifted forward so the slate is
+pickable, and team records are unseeded (the card hides the stat line rather
+than printing `0-0-0`). What is deliberately still inert: "Lock in picks" is a
+confirmation step, not a state change — the week's real lock is `lock_week`.
 
 ## 6. Testing
 
