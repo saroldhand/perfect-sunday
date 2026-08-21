@@ -1,6 +1,43 @@
+# dependencies
 node_modules/
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# next.js
 .next/
 out/
-.env*.local
-.env
+/build
+
+# testing
+/coverage
+
+# env files
+#
+# Order matters here: git applies the last matching rule, so the negations must
+# come after the .env* pattern or they are silently overridden. Both committed
+# files hold only publishable values.
+.env*
+!.env
+!.env.production
+
+# misc
 .DS_Store
+*.pem
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# vercel
+.vercel

@@ -1,0 +1,57 @@
+@import "tailwindcss";
+
+/* Palette from SPEC.md §8. Dark is the only theme — this is a sports product
+   and the result states need to carry the colour without competing with the
+   chrome. */
+@theme {
+  --color-bg: #0b0d10;
+  --color-surface: #15181d;
+  --color-surface-raised: #1e232a;
+  --color-border: #272d35;
+  --color-text: #f2f4f7;
+  --color-text-muted: #8a929e;
+  --color-accent: #f5c518;
+
+  /* Reserved exclusively for pick outcomes. Never use these for buttons,
+     links, or decoration — their only job is to mean right or wrong, and that
+     meaning has to stay uncontaminated. */
+  --color-correct: #2fbf71;
+  --color-wrong: #e5484d;
+
+  --font-display: var(--font-oswald), "Arial Narrow", sans-serif;
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+
+  --radius-card: 12px;
+  --radius-target: 8px;
+}
+
+html {
+  background: var(--color-bg);
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  /* Nothing depends on hover; the whole product assumes a thumb. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Lines and scores must not jitter as they change. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* Motion is almost absent by design, so the one moment that does move — a card
+   resolving green or red during a live week — actually lands. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
