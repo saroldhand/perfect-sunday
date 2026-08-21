@@ -2,7 +2,8 @@
   "permissions": {
     "deny": [
       "mcp__plugin_supabase_supabase",
-      "mcp__supabase-pat"
+      "mcp__supabase-pat",
+      "mcp__47cd472d-6cb7-4315-b4cd-e495177d159f"
     ]
   }
 }

@@ -26,10 +26,17 @@ Enforcement is layered:
    `supabase@claude-plugins-official` plugin (whose MCP server is unpinned) is
    disabled in `~/.claude/settings.json`. Disabling the plugin also removes the
    `supabase:*` skills globally — that was a deliberate trade.
-3. `.claude/settings.json` still denies `mcp__plugin_supabase_supabase` and
-   `mcp__supabase-pat`, so re-enabling either one does not silently reopen the
-   hole in this repo.
+3. `.claude/settings.json` denies `mcp__plugin_supabase_supabase`,
+   `mcp__supabase-pat`, and the claude.ai Supabase connector
+   (`mcp__47cd472d-6cb7-4315-b4cd-e495177d159f`), so none of them silently
+   reopens the hole in this repo.
 4. This file.
+
+**Known gap:** the claude.ai Supabase connector is account-level and is managed
+in claude.ai connector settings, not in local config. It reconnects on its own
+and its tool-name UUID may change, which would defeat the deny rule above. The
+durable fix is to disconnect it in claude.ai. Until then, check `claude mcp list`
+at session start and stop if a second Supabase server is present.
 
 If a Supabase tool appears under any name other than `mcp__supabase__*`, stop
 and report it rather than using it.
