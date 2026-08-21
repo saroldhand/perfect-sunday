@@ -106,8 +106,12 @@ block first, kickoff order, `⬜` for unplayed — is unchanged.
 
 Backend first, so the operator can be hands-off while the frontend is built.
 
-1. **Migration 1 — schema.** All eight tables from SPEC.md §4, the three enums
-   (`week_status`, `game_status`), constraints, and indexes.
+1. **Migration 1 — schema.** All eight tables from SPEC.md §4 and the two enums
+   (`week_status`, `game_status`), plus constraints and indexes. `groups` and
+   `group_members` are created now even though the group UI is Phase 3 — an
+   empty table costs nothing and a later migration against live pick data does.
+   `season_standings` is Phase 3, since a materialized view over one week of
+   entries has nothing to summarize.
 2. **Migration 2 — RLS.** Policies per table. The critical one: `picks` are
    readable only by their owner until the parent week is `locked`, writable
    only while it is `open`.
