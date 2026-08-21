@@ -20,6 +20,12 @@ export const supabase = createClient(url, key, {
     // frame on first paint that the UI covers with a skeleton.
     persistSession: true,
     autoRefreshToken: true,
+    // The magic link lands on /auth/callback/ carrying a code; this exchanges
+    // it for a session automatically.
     detectSessionInUrl: true,
+    // PKCE keeps the one-time code useless to anyone who intercepts the link,
+    // since the verifier never leaves this browser. Worth having even on a
+    // static site, and it is the flow Supabase recommends.
+    flowType: "pkce",
   },
 });
