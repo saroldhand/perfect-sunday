@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "deny": [
+      "mcp__plugin_supabase_supabase",
+      "mcp__supabase-pat"
+    ]
+  }
+}
