@@ -39,7 +39,7 @@ export default function Rules() {
         </Section>
 
         <Section title="How to enter">
-          Pick the moneyline and the spread for every game on the week&rsquo;s
+          Pick the over/under and the spread for every game on the week&rsquo;s
           slate before the posted lock time. An entry counts only if every pick
           is in — a partial set is not scored and does not appear on that
           week&rsquo;s leaderboard. The lock time is shown on the pick screen and
@@ -48,9 +48,10 @@ export default function Rules() {
         </Section>
 
         <Section title="How a winner is determined">
-          A week is won by an entry in which every moneyline and every spread is
-          correct. A spread that lands exactly on the number, and a game that
-          ends in a tie, both count in the entrant&rsquo;s favour.
+          A week is won by an entry in which every over/under and every spread is
+          correct. A combined score that lands exactly on the total, and a
+          spread that lands exactly on the number, both count in the
+          entrant&rsquo;s favour.
         </Section>
 
         <Section title="Prize and multiple winners">
@@ -60,8 +61,8 @@ export default function Rules() {
         </Section>
 
         <Section title="Odds">
-          Long. A perfect week across a typical sixteen-game slate is roughly one
-          in twenty million per entry. Expect to lose.
+          Long. A perfect week across a typical sixteen-game slate is on the order
+          of one in 665 million per entry. Expect to lose.
         </Section>
 
         <Section title="Changes to these rules">

@@ -16,8 +16,9 @@ export type Game = {
   away_team: string;
   kickoff_at: string;
   spread: number | null;
-  moneyline_home: number | null;
-  moneyline_away: number | null;
+  total: number | null;
+  over_odds: number | null;
+  under_odds: number | null;
 };
 
 export type Team = {
@@ -68,7 +69,7 @@ export async function getCurrentWeek(): Promise<Week | null> {
 export async function getGames(weekId: number): Promise<Game[]> {
   const { data, error } = await supabase
     .from("games")
-    .select("id, home_team, away_team, kickoff_at, spread, moneyline_home, moneyline_away")
+    .select("id, home_team, away_team, kickoff_at, spread, total, over_odds, under_odds")
     .eq("week_id", weekId)
     .order("kickoff_at", { ascending: true })
     .order("id", { ascending: true });

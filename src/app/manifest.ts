@@ -14,7 +14,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Perfect Sunday",
     short_name: "Perfect Sunday",
     description:
-      "Pick every moneyline and every spread on the NFL slate. Get them all right and win the prize.",
+      "Pick every over/under and every spread on the NFL slate. Get them all right and win the prize.",
     start_url: `${basePath}/`,
     scope: `${basePath}/`,
     display: "standalone",

@@ -63,14 +63,15 @@ over already-final games changes nothing. That is verified in
 
 | Situation | Result |
 |---|---|
-| Picked team won outright | moneyline correct |
-| Game ended in a tie | moneyline correct for **both** sides |
+| Combined score beat the total | over correct |
+| Combined score fell short of the total | under correct |
+| Combined score landed exactly on the total | correct for **both** sides |
 | Picked team covered | spread correct |
 | Spread landed exactly on the number | spread correct for **both** sides |
 | Pick left blank | stays ungraded, never counted correct |
 
-Half-point spreads make pushes rare, but whole numbers do occur and the
-generous reading avoids arguments.
+Half-point lines make a landed number rare on either layer, but whole numbers
+do occur and the generous reading avoids arguments.
 
 ## 4. Check for a winner
 
@@ -92,7 +93,7 @@ liability at exactly the posted amount regardless of entry volume.
 To replay the demo week from scratch:
 
 ```sql
-update public.picks set moneyline_correct = null, spread_correct = null;
+update public.picks set total_correct = null, spread_correct = null;
 delete from public.entries where week_id = 1;
 update public.games set home_score = null, away_score = null, status = 'scheduled'
 where week_id = 1;

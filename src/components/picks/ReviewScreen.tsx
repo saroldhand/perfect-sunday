@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { lineFor, formatKickoff } from "@/lib/format";
+import { lineFor, formatKickoff, formatTotal } from "@/lib/format";
 import { isGameComplete, type PickMap } from "@/lib/picks";
 import { buildPicksShare, shareText } from "@/lib/share";
 import type { Game } from "@/lib/week";
@@ -33,8 +33,8 @@ export function ReviewScreen({
   async function share() {
     const text = buildPicksShare(
       weekNumber,
-      games.map((g) => picks[g.id]?.moneyline ?? "—"),
-      games.map((g) => picks[g.id]?.spread ?? "—"),
+      games.map((g) => picks[g.id]?.total ?? null),
+      games.map((g) => picks[g.id]?.spread ?? null),
     );
     const outcome = await shareText(text);
     if (outcome === "shared") return; // the native sheet is its own feedback
@@ -99,9 +99,9 @@ export function ReviewScreen({
                   {complete ? (
                     <>
                       <span className="text-[var(--color-text)]">
-                        {pick!.moneyline}
+                        {pick!.total === "OVER" ? "Over" : "Under"}
                       </span>{" "}
-                      to win ·{" "}
+                      <span className="tabular">{formatTotal(game.total)}</span> ·{" "}
                       <span className="text-[var(--color-text)]">
                         {pick!.spread}
                       </span>{" "}

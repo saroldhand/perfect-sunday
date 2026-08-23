@@ -4,6 +4,12 @@ export function formatOdds(odds: number | null): string {
   return odds > 0 ? `+${odds}` : `${odds}`;
 }
 
+/** The over/under number itself, e.g. 44.5. */
+export function formatTotal(total: number | null): string {
+  if (total === null) return "—";
+  return total % 1 === 0 ? total.toFixed(0) : total.toFixed(1);
+}
+
 /**
  * `spread` on a game is the home team's line, so the away side is its
  * negation. Returned with an explicit sign because "CIN -3.5" and "BAL +3.5"

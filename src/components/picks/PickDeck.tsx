@@ -5,7 +5,14 @@ import { GameCard } from "./GameCard";
 import { ProgressBar } from "./ProgressBar";
 import { ReviewScreen } from "./ReviewScreen";
 import { countdownTo, formatLockTime } from "@/lib/format";
-import { countCompleted, isGameComplete, savePick, type PickMap } from "@/lib/picks";
+import {
+  countCompleted,
+  isGameComplete,
+  savePick,
+  type Pick,
+  type PickMap,
+  type TotalSide,
+} from "@/lib/picks";
 import type { Game, Team, Week } from "@/lib/week";
 
 // Long enough to see the selection register, short enough to feel fast.
@@ -55,12 +62,12 @@ export function PickDeck({ userId, week, games, teams, initialPicks }: Props) {
     [games.length],
   );
 
-  function handlePick(game: Game, kind: "moneyline" | "spread", team: string) {
+  function handlePick(game: Game, kind: "total" | "spread", value: string) {
     const before = picks[game.id];
     const wasComplete = isGameComplete(before);
-    const next = {
-      moneyline: kind === "moneyline" ? team : (before?.moneyline ?? null),
-      spread: kind === "spread" ? team : (before?.spread ?? null),
+    const next: Pick = {
+      total: kind === "total" ? (value as TotalSide) : (before?.total ?? null),
+      spread: kind === "spread" ? value : (before?.spread ?? null),
     };
 
     // Optimistic: the tap must feel instant, and a failed write is recoverable
@@ -68,9 +75,11 @@ export function PickDeck({ userId, week, games, teams, initialPicks }: Props) {
     setPicks((current) => ({ ...current, [game.id]: next }));
     setSaveError(null);
 
-    savePick(userId, game.id, {
-      [kind === "moneyline" ? "moneyline_pick" : "spread_pick"]: team,
-    }).catch((err: unknown) => {
+    savePick(
+      userId,
+      game.id,
+      kind === "total" ? { total_pick: value as TotalSide } : { spread_pick: value },
+    ).catch((err: unknown) => {
       setSaveError(err instanceof Error ? err.message : String(err));
     });
 
@@ -152,7 +161,8 @@ export function PickDeck({ userId, week, games, teams, initialPicks }: Props) {
             game={game}
             teams={teams}
             pick={picks[game.id]}
-            onPick={(kind, team) => handlePick(game, kind, team)}
+            onPickTotal={(side) => handlePick(game, "total", side)}
+            onPickSpread={(team) => handlePick(game, "spread", team)}
             disabled={!weekOpen || new Date(game.kickoff_at).getTime() <= now}
           />
         ) : (

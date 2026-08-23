@@ -11,6 +11,7 @@ shape. Where the two conflict, this document wins.
 | Hosting: Vercel | **GitHub Pages** | Operator preference. Free, no new account. |
 | Next.js App Router (SSR implied) | Next.js App Router with `output: 'export'` | Pages serves static files only. Same codebase moves to Vercel later by deleting one config line. |
 | Domain `perfectsunday.app` | `saroldhand.github.io/perfect-sunday` | No domain purchased yet. |
+| Format: moneyline + spread | **Over/under + spread** | Operator decision, 2026-08-21. Reverses SPEC.md §2, which rejected over/unders. The cost is real and is recorded rather than hidden: a perfect week moves from roughly 1 in 20 million to roughly **1 in 665 million**, and the layer that made the game feel winnable — moneylines hit ~66%, so most users got 12–14 of 16 — is the layer that was removed. The prize is correspondingly cheaper to underwrite. |
 
 Nothing else in SPEC.md changes. Data model, scoring rules, screens,
 palette, and build order stand as written.
@@ -99,8 +100,11 @@ exists, that line is a single exported constant:
 export const SHARE_DOMAIN = 'saroldhand.github.io/perfect-sunday'
 ```
 
-Everything else about the share format — eight squares per line, moneyline
-block first, kickoff order, `⬜` for unplayed — is unchanged.
+Everything else about the share format — eight per line, kickoff order, `⬜`
+for unplayed — is unchanged, except that the first block is now the over/under
+rather than the moneyline. Totals share as `O` and `U` rather than the words:
+eight of "OVER" across is far past the width of an iMessage bubble, and a text
+share that wraps defeats the point.
 
 ## 5. Phase 1 scope
 
@@ -133,8 +137,8 @@ what Phase 2's Edge Functions will call on a timer. The runbook is
 ### Status as of 2026-08-21
 
 All six Phase 1 items are built and deployed. Verified in production by a real
-signed-in user: a complete 32-pick entry saved, with `moneyline_correct` and
-`spread_correct` untouched — the column grant held.
+signed-in user: a complete 32-pick entry saved, with the grading columns
+untouched — the column grant held.
 
 What is deliberately still fake: every line is invented and stamped
 `line_source = 'demo'`, kickoff dates are shifted forward so the slate is

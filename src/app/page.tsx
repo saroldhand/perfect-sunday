@@ -83,7 +83,7 @@ export default function SignIn() {
         Perfect Sunday
       </h1>
       <p className="mt-3 text-sm text-[var(--color-text-muted)]">
-        Pick every moneyline and every spread on the slate. Get them all right
+        Pick every over/under and every spread on the slate. Get them all right
         and win the prize. Nobody will.
       </p>
 

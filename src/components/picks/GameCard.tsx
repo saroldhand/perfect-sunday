@@ -1,18 +1,27 @@
 "use client";
 
 import { accentColor } from "@/lib/teamColor";
-import { formatKickoff, formatOdds, lineFor } from "@/lib/format";
+import { formatKickoff, formatOdds, formatTotal, lineFor } from "@/lib/format";
+import type { Pick, TotalSide } from "@/lib/picks";
 import type { Game, Team } from "@/lib/week";
 
 type Props = {
   game: Game;
   teams: Record<string, Team>;
-  pick?: { moneyline: string | null; spread: string | null };
-  onPick: (kind: "moneyline" | "spread", team: string) => void;
+  pick?: Pick;
+  onPickTotal: (side: TotalSide) => void;
+  onPickSpread: (team: string) => void;
   disabled: boolean;
 };
 
-export function GameCard({ game, teams, pick, onPick, disabled }: Props) {
+export function GameCard({
+  game,
+  teams,
+  pick,
+  onPickTotal,
+  onPickSpread,
+  disabled,
+}: Props) {
   const away = teams[game.away_team];
   const home = teams[game.home_team];
 
@@ -31,21 +40,25 @@ export function GameCard({ game, teams, pick, onPick, disabled }: Props) {
       <div className="my-2" />
       <TeamBand team={home} />
 
+      {/* Total first, then spread — same order the share grid uses, so the
+          card and the grid agree about which block is which. */}
       <PickRow
-        label="Moneyline"
-        hint="Who wins"
+        label="Total"
+        hint={game.total === null ? "No line" : `O/U ${formatTotal(game.total)}`}
         options={[
           {
-            team: game.away_team,
-            detail: formatOdds(game.moneyline_away),
+            value: "OVER",
+            label: "Over",
+            detail: `${formatTotal(game.total)}  ${formatOdds(game.over_odds)}`,
           },
           {
-            team: game.home_team,
-            detail: formatOdds(game.moneyline_home),
+            value: "UNDER",
+            label: "Under",
+            detail: `${formatTotal(game.total)}  ${formatOdds(game.under_odds)}`,
           },
         ]}
-        selected={pick?.moneyline ?? null}
-        onSelect={(team) => onPick("moneyline", team)}
+        selected={pick?.total ?? null}
+        onSelect={(value) => onPickTotal(value as TotalSide)}
         disabled={disabled}
       />
 
@@ -54,16 +67,18 @@ export function GameCard({ game, teams, pick, onPick, disabled }: Props) {
         hint="Who covers"
         options={[
           {
-            team: game.away_team,
+            value: game.away_team,
+            label: game.away_team,
             detail: lineFor(game.spread, "away"),
           },
           {
-            team: game.home_team,
+            value: game.home_team,
+            label: game.home_team,
             detail: lineFor(game.spread, "home"),
           },
         ]}
         selected={pick?.spread ?? null}
-        onSelect={(team) => onPick("spread", team)}
+        onSelect={onPickSpread}
         disabled={disabled}
       />
     </article>
@@ -108,9 +123,9 @@ function PickRow({
 }: {
   label: string;
   hint: string;
-  options: { team: string; detail: string }[];
+  options: { value: string; label: string; detail: string }[];
   selected: string | null;
-  onSelect: (team: string) => void;
+  onSelect: (value: string) => void;
   disabled: boolean;
 }) {
   return (
@@ -119,18 +134,18 @@ function PickRow({
         <span className="text-xs font-medium uppercase tracking-widest text-[var(--color-text-muted)]">
           {label}
         </span>
-        <span className="text-xs text-[var(--color-text-muted)]">{hint}</span>
+        <span className="tabular text-xs text-[var(--color-text-muted)]">{hint}</span>
       </div>
       <div className="grid grid-cols-2 gap-2">
         {options.map((option) => {
-          const isSelected = selected === option.team;
+          const isSelected = selected === option.value;
           return (
             <button
-              key={option.team}
+              key={option.value}
               type="button"
               disabled={disabled}
               aria-pressed={isSelected}
-              onClick={() => onSelect(option.team)}
+              onClick={() => onSelect(option.value)}
               className={`flex min-h-14 flex-col items-center justify-center rounded-[var(--radius-target)] border transition-colors duration-[120ms] ${
                 isSelected
                   ? "border-[var(--color-accent)] bg-[var(--color-surface-raised)]"
@@ -142,7 +157,7 @@ function PickRow({
                   isSelected ? "text-[var(--color-accent)]" : ""
                 }`}
               >
-                {option.team}
+                {option.label}
               </span>
               <span className="tabular mt-1 text-xs text-[var(--color-text-muted)]">
                 {option.detail}
