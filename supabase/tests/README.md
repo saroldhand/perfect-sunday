@@ -1,6 +1,6 @@
 # Database tests
 
-Three suites. `rls.sql` asserts the deny case for every policy that guards user data. It is
+Four suites. `rls.sql` asserts the deny case for every policy that guards user data. It is
 the difference between "RLS is enabled" and "RLS works".
 
 Run it against the project database. Statements marked **Expect ERROR 42501**
@@ -85,3 +85,40 @@ Results as of 2026-08-24, all 9 passing:
 Tests 2 and 9 are the ones worth having. Both failures — locking a week early,
 and rewriting a result that has already been published — are invisible in a
 single run and only surface after the job has been on a timer for a week.
+
+## `lines.sql` — applying lines and opening a week
+
+Covers `private.apply_week_lines` and `private.next_week_needing_lines` (0016),
+plus the grants on their `public` wrappers. Fixture weeks 980-982, transaction
+ending in ROLLBACK.
+
+Results as of 2026-08-24, all 16 passing:
+
+| Test | Asserts | Result |
+|---|---|---|
+| 1 | `next_week_needing_lines` picks the earliest unfilled week | PASS |
+| 2 | A partial fill updates the games it has | PASS |
+| 3 | A partial fill reports the remaining gap | PASS |
+| 4 | A partial fill does **not** open the week | PASS |
+| 5 | The week is still `upcoming` after a partial fill | PASS |
+| 6 | A complete fill leaves nothing missing | PASS |
+| 7 | A complete fill opens the week | PASS |
+| 8 | `over_odds` and `under_odds` land in the right columns | PASS |
+| 9 | `line_source` is stored per game | PASS |
+| 10 | A locked week accepts no updates | PASS |
+| 11 | A locked week's line is unchanged | PASS |
+| 12 | A locked week's `line_source` is unchanged | PASS |
+| 13 | A filled week drops out of the sync queue | PASS |
+| 14 | `anon` cannot execute the line writer | PASS |
+| 15 | `authenticated` cannot execute the line writer | PASS |
+| 16 | `service_role` can execute the line writer | PASS |
+
+Tests 10-12 are the reason this file exists. Every entry in a locked week was
+graded against the numbers standing at lock; a feed that rewrites one changes
+what people were scored on after the fact.
+
+Tests 8 and 14-16 guard defaults rather than logic. The source CSV lists
+`under_odds` before `over_odds`, so a positional reader transposes them
+invisibly; and `EXECUTE` is granted to PUBLIC by default on a new function,
+which would put line-writing within reach of the publishable key that ships in
+the build.

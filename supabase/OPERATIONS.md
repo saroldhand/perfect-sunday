@@ -1,10 +1,12 @@
 # Running a week by hand
 
-The operator runs three steps from the Supabase SQL editor. Steps 2 and 3 can
-now be handed to `pg_cron` instead — see [Putting steps 2 and 3 on a
-timer](#putting-steps-2-and-3-on-a-timer) — but nothing is scheduled by
-default, and step 1 and entering final scores stay manual until `sync-slate`
-exists.
+The operator runs three steps from the Supabase SQL editor. All three can now be
+automated instead — `sync-slate` opens a week once its lines land, and `pg_cron`
+can run the lock and grade jobs — but **nothing is scheduled by default**, so
+until you switch it on, the steps below are how a week runs.
+
+Entering final scores is the one part still manual everywhere: `sync-slate`
+fetches lines, not results.
 
 Every function below lives in the `private` schema, which PostgREST does not
 expose. There is no REST endpoint for them, so a signed-in user cannot reach
@@ -58,14 +60,97 @@ id rather than resetting it. A statement filtered on a guessed id does not
 error; it matches nothing and reports success, which is the worst way for an
 operator step to fail. Substitute the season and week number, not an id.
 
+## The season is preloaded; the lines are not
+
+Migration 0015 seeds the whole 2026 regular season — 18 weeks, 272 games — with
+matchups, kickoff times and computed lock times, and with `spread`, `total`,
+`over_odds`, `under_odds` and `line_source` all NULL. Schedules are published
+months ahead; lines are not. Loading what is known early leaves only the numbers
+to fill in weekly.
+
+Every week is seeded `upcoming`. **A week must not be opened until every game on
+its slate has a complete line** — that is SPEC §5's rule, and it is what stops
+anyone picking against a number that is not really there.
+
+Three weeks lock earlier than the usual Thursday 4:00 PM ET, because their slate
+opens before it:
+
+| Week | Opens | Locks |
+|---|---|---|
+| 1 | Wed 9 Sep, 8:20 PM ET — season opener | Wed 9 Sep, 7:50 PM ET |
+| 12 | Wed 25 Nov, 8:00 PM ET — Thanksgiving week | Wed 25 Nov, 7:30 PM ET |
+| 18 | Sun 10 Jan, 1:00 PM ET — no Thursday game | Sun 10 Jan, 12:30 PM ET |
+
+The lock time is always shown to the user rather than assumed, so an early lock
+never surprises anyone — but it does mean **Week 1 closes on a Wednesday**.
+
+### Filling in a week's lines by hand
+
+`sync-slate` does this automatically — see [sync-slate: pulling the
+lines](#sync-slate-pulling-the-lines). This is the manual fallback, for a
+correction or when the feed is short.
+
+```sql
+update public.games g set
+  spread = v.spread, total = v.total,
+  over_odds = v.over_odds, under_odds = v.under_odds,
+  line_source = 'fanduel'
+from (values
+  ('2026-01-NE-SEA',  -3.5, 44.5, -110, -110),
+  ('2026-01-DAL-PHI',  2.5, 47.5, -105, -115)
+  -- ...one row per game on the slate
+) as v (external_id, spread, total, over_odds, under_odds)
+where g.external_id = v.external_id;
+```
+
+`external_id` is `{season}-{week}-{away}-{home}`, e.g. `2026-01-NE-SEA`, and is
+unique across the season, so this needs no week filter.
+
+Set `line_source` to the book the numbers actually came from. If they did not
+come from FanDuel, say so — grading an entry against a line the user never saw
+is the worst failure this product has, and a wrong provenance label is how that
+happens quietly.
+
+### Check the slate is complete before opening
+
+```sql
+select w.week_number,
+       count(*) as games,
+       count(*) filter (where g.spread is null or g.total is null) as missing
+from public.games g
+join public.weeks w on w.id = g.week_id
+where w.season = 2026
+group by w.week_number
+order by w.week_number;
+```
+
+Open the week only when `missing` is 0. Step 1 below is that step.
+
+### Cutting over from the demo week
+
+The 2025 Week 18 demo week is still in the database and still `open`, and an
+open week wins over every upcoming one — so until it is closed, the app shows
+the demo rather than the real season. Before Week 1:
+
+```sql
+update public.weeks set status = 'scored'
+where season = 2025 and week_number = 18;
+```
+
+`scored` rather than deleted keeps the demo picks and entries as history and
+keeps the leaderboard's "last scored week" fallback with something to show. To
+remove it outright instead, `delete from public.weeks where season = 2025 and
+week_number = 18;` cascades to its games, picks and entries.
+
 ## 1. Open the week
 
 Picks are writable only while `weeks.status = 'open'` — that is enforced by RLS,
 not by the UI.
 
 ```sql
+-- Only once the slate check above reports missing = 0.
 update public.weeks set status = 'open'
-where season = 2025 and week_number = 18;
+where season = 2026 and week_number = 1;
 ```
 
 ## 2. Lock it
@@ -77,7 +162,7 @@ leaderboard — their pick rows stay for their own history.
 
 ```sql
 select private.lock_week(
-  (select id from public.weeks where season = 2025 and week_number = 18)
+  (select id from public.weeks where season = 2026 and week_number = 1)
 );
 ```
 
@@ -93,22 +178,22 @@ One call per finished game, then one call to grade. `set_final_score` takes the
 from a box score.
 
 ```sql
--- Week 18 demo slate: external_ids are '2025-18-AWAY-HOME'.
+-- external_ids are '{season}-{week}-AWAY-HOME', e.g. '2026-01-NE-SEA'.
 -- One row per finished game. The numbers below are placeholders — replace them
 -- with the real box score.
 with wk as (
-  select id from public.weeks where season = 2025 and week_number = 18
+  select id from public.weeks where season = 2026 and week_number = 1
 )
 select private.set_final_score(wk.id, v.external_id, v.home_score, v.away_score)
 from wk
 cross join (values
-  ('2025-18-CAR-TB', 17, 24),
-  ('2025-18-SEA-SF', 20, 13)
+  ('2026-01-NE-SEA',  17, 24),
+  ('2026-01-DAL-PHI', 20, 13)
   -- ...
 ) as v (external_id, home_score, away_score);
 
 select * from private.score_week(
-  (select id from public.weeks where season = 2025 and week_number = 18)
+  (select id from public.weeks where season = 2026 and week_number = 1)
 );
 ```
 
@@ -144,7 +229,7 @@ select p.display_name, e.correct_count, e.picks_possible
 from public.entries e
 join public.profiles p on p.id = e.user_id
 join public.weeks w on w.id = e.week_id
-where w.season = 2025 and w.week_number = 18 and e.is_perfect;
+where w.season = 2026 and w.week_number = 1 and e.is_perfect;
 ```
 
 If this ever returns a row, handle the prize manually. Multiple winners split
@@ -179,6 +264,75 @@ Both columns must move together. The card shows no numbers at all unless
 `stats_season` and `updated_through_week` are both set, which is deliberate:
 an unlabelled record is worse than a sparse card, because the reader supplies
 the wrong season themselves. Phase 2's `sync-slate` takes this step over.
+
+## sync-slate: pulling the lines
+
+`supabase/functions/sync-slate` fetches a week's lines and applies them. It is
+the only one of the three Phase 2 jobs that is an Edge Function, because it is
+the only one that makes an outbound call.
+
+**Where the lines come from, stated plainly.** The provider is nflverse's
+published market data. Those are a **consensus line, not a named sportsbook** —
+nflverse does not attribute them to one, so `line_source` is written as
+`nflverse-consensus` rather than `fanduel`. If the game is ever advertised as
+using FanDuel numbers, the provider has to change first; relabelling alone would
+be grading people against a line they were never shown.
+
+No major book publishes a public odds API. Switching to a named book means an
+aggregator that carries one — SPEC's working assumption is The Odds API with a
+`bookmakers=fanduel` filter — and that is one new `OddsProvider` in
+`supabase/functions/_shared/oddsProvider.ts` plus the constant `sync-slate`
+constructs. Nothing else moves.
+
+### Deploying and running it
+
+```bash
+supabase functions deploy sync-slate
+```
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the runtime;
+there is nothing to configure. Run it by hand:
+
+```bash
+# the earliest not-yet-locked week still missing lines
+curl -X POST "https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+
+# or a specific week
+curl -X POST "https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "content-type: application/json" -d '{"weekId": 12}'
+```
+
+It reports `updated`, `missing` and `opened`. `opened: true` means the slate was
+complete and the week is now taking picks. `missing` above zero means it is not,
+and the week stays shut — which is the intended outcome, not a failure.
+
+### Scheduling it
+
+Not scheduled by default, same as the other two. SPEC §5 wants it hourly from
+Tuesday until the slate is complete; hourly year-round is simpler and costs
+nothing, since it returns `nothing-to-do` when no week needs lines.
+
+```sql
+select cron.schedule('sync-slate', '0 * * * *', $$
+  select net.http_post(
+    url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate',
+    headers := '{"Content-Type":"application/json"}'::jsonb
+  );
+$$);
+```
+
+This needs `pg_net` as well as `pg_cron`. Unschedule with
+`select cron.unschedule('sync-slate');`.
+
+### What it will not do
+
+- Touch a locked or scored week. Its numbers are what entries were graded
+  against, and `apply_week_lines` refuses them outright.
+- Open a week with any game missing a line.
+- Write a partial line. A game missing any of spread, total, over odds or under
+  odds is skipped entirely, leaving the column NULL so the week stays shut.
 
 ## Putting steps 2 and 3 on a timer
 
@@ -250,6 +404,9 @@ grades whatever `set_final_score` has marked final, and nothing yet marks games
 final on its own.
 
 ## Resetting the demo
+
+Aimed at the 2025 Week 18 demo week specifically — substitute the season and
+week number to rewind a real one.
 
 To replay the demo week from scratch:
 

@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import { selectCurrentWeek } from "@/lib/schedule";
 
 export type WeekStatus = "upcoming" | "open" | "locked" | "scored";
 
@@ -49,32 +50,18 @@ export type Team = {
  * the most recent by season and number. Returns null on an empty database.
  */
 export async function getCurrentWeek(): Promise<Week | null> {
-  const open = await supabase
+  // Every week, not a filtered top-1. There are nineteen rows and the choice
+  // between them depends on status and clock together, which is easier to get
+  // right — and to test — in one pure function than in a chain of queries.
+  const { data, error } = await supabase
     .from("weeks")
     .select("id, season, week_number, locks_at, status")
-    .eq("status", "open")
-    .order("season", { ascending: false })
-    .order("week_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("locks_at", { ascending: true });
 
-  if (open.error) throw new Error(open.error.message);
-  if (open.data) return open.data as Week;
-
-  const latest = await supabase
-    .from("weeks")
-    .select("id, season, week_number, locks_at, status")
-    .order("season", { ascending: false })
-    .order("week_number", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (latest.error) throw new Error(latest.error.message);
-  return (latest.data as Week) ?? null;
+  if (error) throw new Error(error.message);
+  return selectCurrentWeek((data ?? []) as Week[], Date.now());
 }
 
-/** Games in kickoff order. That ordering is load-bearing: it is what makes two
- *  people comparing share grids look at the same game in the same position. */
 export async function getGames(weekId: number): Promise<Game[]> {
   const { data, error } = await supabase
     .from("games")
