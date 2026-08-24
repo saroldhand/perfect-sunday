@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { lineFor, formatKickoff, formatTotal } from "@/lib/format";
+import { PickSummaryRow } from "@/components/week/PickSummaryRow";
 import { isGameComplete, type PickMap } from "@/lib/picks";
 import { buildPicksShare, shareText } from "@/lib/share";
 import type { Game } from "@/lib/week";
@@ -79,47 +79,15 @@ export function ReviewScreen({
       </p>
 
       <ul className="mt-5 divide-y divide-[var(--color-border)] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
-        {games.map((game, index) => {
-          const pick = picks[game.id];
-          const complete = isGameComplete(pick);
-          return (
-            <li key={game.id}>
-              <button
-                type="button"
-                onClick={() => onJump(index)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left"
-              >
-                <span className="tabular w-6 shrink-0 text-xs text-[var(--color-text-muted)]">
-                  {index + 1}
-                </span>
-                <span className="font-[family-name:var(--font-display)] w-28 shrink-0 text-base font-semibold uppercase">
-                  {game.away_team} @ {game.home_team}
-                </span>
-                <span className="min-w-0 flex-1 text-xs text-[var(--color-text-muted)]">
-                  {complete ? (
-                    <>
-                      <span className="text-[var(--color-text)]">
-                        {pick!.total === "OVER" ? "Over" : "Under"}
-                      </span>{" "}
-                      <span className="tabular">{formatTotal(game.total)}</span> ·{" "}
-                      <span className="text-[var(--color-text)]">
-                        {pick!.spread}
-                      </span>{" "}
-                      <span className="tabular">
-                        {lineFor(
-                          game.spread,
-                          pick!.spread === game.home_team ? "home" : "away",
-                        )}
-                      </span>
-                    </>
-                  ) : (
-                    <span>Not picked · {formatKickoff(game.kickoff_at)}</span>
-                  )}
-                </span>
-              </button>
-            </li>
-          );
-        })}
+        {games.map((game, index) => (
+          <PickSummaryRow
+            key={game.id}
+            index={index}
+            game={game}
+            pick={picks[game.id]}
+            onJump={() => onJump(index)}
+          />
+        ))}
       </ul>
 
       <button

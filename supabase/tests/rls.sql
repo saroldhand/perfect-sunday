@@ -133,6 +133,29 @@ insert into public.picks (user_id, game_id, total_pick, spread_pick)
 values ('11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-4000-8000-000000000002','OVER','KC');
 rollback;
 
+-- === TEST 11: anon reads a hidden profile column. Expect ERROR 42501 ========
+-- The policy lets anon see profile rows; only the column grant stops it
+-- reading when someone accepted the terms. This is the test for that grant.
+-- Expected: permission denied for table profiles
+begin;
+set local role anon;
+select terms_accepted_at from public.profiles limit 1;
+rollback;
+
+-- === TEST 12: anon reads the public profile columns. Expect 2 rows ==========
+-- The mirror of test 11. Guards against a future tightening that silently
+-- blanks every name on the public board.
+begin;
+set local role anon;
+select 'TEST 12 anon reads public profile columns' as test, count(*) as rows_visible,
+       case when count(*) = 2 then 'PASS' else 'FAIL' end as verdict
+from (
+  select id, display_name from public.profiles
+  where id in ('11111111-1111-1111-1111-111111111111',
+               '22222222-2222-2222-2222-222222222222')
+) p;
+rollback;
+
 -- === teardown ================================================================
 delete from public.picks where user_id in ('11111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222');
 delete from public.weeks where id = 999;

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { supabase } from "@/lib/supabase/client";
 import { useSession } from "@/hooks/useSession";
 import { getProfile, type Profile } from "@/lib/profile";
@@ -120,6 +121,14 @@ export default function Picks() {
 
   return (
     <>
+      <div className="mx-auto w-full max-w-md px-4 pt-4">
+        <Link
+          href="/"
+          className="text-sm text-[var(--color-text-muted)] underline underline-offset-4"
+        >
+          ← Back
+        </Link>
+      </div>
       <PickDeck
         userId={profile.id}
         week={week}

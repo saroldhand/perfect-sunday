@@ -44,7 +44,7 @@ export type Countdown = {
 
 export function countdownTo(iso: string, now: number): Countdown {
   const ms = new Date(iso).getTime() - now;
-  if (ms <= 0) return { expired: true, label: "Picks are locked" };
+  if (ms <= 0) return { expired: true, label: "Locking now" };
 
   const totalMinutes = Math.floor(ms / 60_000);
   const days = Math.floor(totalMinutes / 1440);

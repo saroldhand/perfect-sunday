@@ -1,10 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
-import { useSession } from "@/hooks/useSession";
-import { getProfile, landingRoute } from "@/lib/profile";
 import { absoluteUrl } from "@/lib/urls";
 import { GOOGLE_AUTH_ENABLED } from "@/lib/constants";
 
@@ -14,27 +11,9 @@ type SendState =
   | { status: "sent"; email: string }
   | { status: "error"; message: string };
 
-export default function SignIn() {
-  const session = useSession();
-  const router = useRouter();
+export function SignInForm() {
   const [email, setEmail] = useState("");
   const [send, setSend] = useState<SendState>({ status: "idle" });
-
-  // Someone arriving with a live session should never see the sign-in screen.
-  useEffect(() => {
-    if (session.status !== "signed-in") return;
-    let active = true;
-    getProfile(session.session.user.id)
-      .then((profile) => {
-        if (active) router.replace(landingRoute(profile));
-      })
-      .catch(() => {
-        if (active) router.replace("/welcome");
-      });
-    return () => {
-      active = false;
-    };
-  }, [session, router]);
 
   async function sendLink(e: React.FormEvent) {
     e.preventDefault();
@@ -49,10 +28,6 @@ export default function SignIn() {
 
     if (error) setSend({ status: "error", message: error.message });
     else setSend({ status: "sent", email: address });
-  }
-
-  if (session.status === "checking") {
-    return <Skeleton />;
   }
 
   if (send.status === "sent") {
@@ -147,23 +122,8 @@ export default function SignIn() {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12">
-      {children}
-    </main>
-  );
-}
-
-function Skeleton() {
-  return (
-    <main
-      className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12"
-      aria-hidden
-    >
-      <div className="h-10 w-2/3 rounded bg-[var(--color-surface)]" />
-      <div className="mt-4 h-4 w-full rounded bg-[var(--color-surface)]" />
-      <div className="mt-2 h-4 w-4/5 rounded bg-[var(--color-surface)]" />
-      <div className="mt-8 h-14 w-full rounded-[var(--radius-target)] bg-[var(--color-surface)]" />
-    </main>
-  );
+  // The route-group layout owns the page frame — width, horizontal padding, and
+  // the space under the tab bar. This only needs to sit roughly centred inside
+  // it, so it must not restate min-h-dvh or the max width.
+  return <div className="flex min-h-[70dvh] flex-col justify-center">{children}</div>;
 }

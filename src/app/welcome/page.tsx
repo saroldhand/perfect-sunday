@@ -76,7 +76,7 @@ export default function Welcome() {
     setError(null);
     try {
       await createProfile(session.session.user.id, name.trim());
-      router.replace("/picks");
+      router.replace("/");
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (message === "TAKEN") {

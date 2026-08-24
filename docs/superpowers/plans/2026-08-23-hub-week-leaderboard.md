@@ -306,7 +306,7 @@ where table_schema = 'public' and table_name = 'profiles'
 group by grantee order by grantee;
 ```
 
-Expected: `anon` → `avatar_url, display_name, id` and nothing else. `authenticated` → all seven columns.
+Expected: `anon` → `avatar_url, display_name, id` and nothing else. `authenticated` → all six columns of the table, unchanged.
 
 - [ ] **Step 4: Add the two negative-case tests**
 
@@ -1221,6 +1221,8 @@ export function landingRoute(profile: Profile | null): "/welcome" | "/" {
 
 In `src/app/welcome/page.tsx`, line 79, change `router.replace("/picks")` to `router.replace("/")`.
 
+In `src/app/auth/callback/page.tsx`, the comment above the routing effect (around line 39) ends "to the display-name gate for a new user, to the picks for a returning one." The code still works — it only uses `landingRoute`'s return — but the comment now misdescribes where a returning user lands. Change that clause to "to the hub for a returning one." Change nothing else in that file.
+
 - [ ] **Step 2: Write the hub**
 
 Replace the whole contents of `src/app/(app)/page.tsx`:
@@ -1814,10 +1816,14 @@ export default function Leaderboard() {
   }
 
   const ranked = rankEntries(boardEntries);
-  const showsCurrent = boardWeek !== null && week !== null && boardWeek.id === week.id;
+  // Read the status out in one step rather than aliasing a boolean guard —
+  // relying on TypeScript to carry `week !== null` across two statements is
+  // fragile, and this says the same thing without the inference.
+  const currentStatus =
+    boardWeek !== null && week !== null && boardWeek.id === week.id ? week.status : null;
+  const showsCurrent = currentStatus !== null;
   // The chip means nothing before lock: everyone is trivially alive.
-  const showChips =
-    showsCurrent && (week.status === "locked" || week.status === "scored");
+  const showChips = currentStatus === "locked" || currentStatus === "scored";
 
   return (
     <>

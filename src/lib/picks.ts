@@ -94,3 +94,50 @@ export function isGameComplete(pick?: Pick) {
 export function countCompleted(picks: PickMap, gameIds: string[]) {
   return gameIds.filter((id) => isGameComplete(picks[id])).length;
 }
+
+/** A pick plus how it graded. Null grade means not graded yet — never wrong. */
+export type Result = Pick & {
+  totalCorrect: boolean | null;
+  spreadCorrect: boolean | null;
+};
+
+export type ResultMap = Record<string, Result>;
+
+type ResultRow = PickRow & {
+  total_correct: boolean | null;
+  spread_correct: boolean | null;
+};
+
+/**
+ * Own picks with their grades, for My Week and the hub.
+ *
+ * Reading the grading columns is allowed and always has been — RLS and the
+ * column grant restrict who may *write* total_correct and spread_correct,
+ * never who may read their own. getPicks stays grade-free on purpose: the
+ * deck is the one screen that must never show them.
+ */
+export async function getResults(
+  userId: string,
+  gameIds: string[],
+): Promise<ResultMap> {
+  if (gameIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from("picks")
+    .select("game_id, total_pick, spread_pick, total_correct, spread_correct")
+    .eq("user_id", userId)
+    .in("game_id", gameIds);
+
+  if (error) throw new Error(error.message);
+
+  const map: ResultMap = {};
+  for (const row of (data ?? []) as ResultRow[]) {
+    map[row.game_id] = {
+      total: (row.total_pick as TotalSide | null) ?? null,
+      spread: row.spread_pick,
+      totalCorrect: row.total_correct,
+      spreadCorrect: row.spread_correct,
+    };
+  }
+  return map;
+}

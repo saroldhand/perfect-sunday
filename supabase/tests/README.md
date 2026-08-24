@@ -8,7 +8,7 @@ are supposed to fail, so a client that halts on the first error will stop
 there. Each test is its own transaction for that reason — run them
 individually, or through a harness that records the error and continues.
 
-Results as of 2026-08-21, all 10 passing:
+Results as of 2026-08-23, all 12 passing:
 
 | Test | Asserts | Result |
 |---|---|---|
@@ -22,6 +22,8 @@ Results as of 2026-08-21, all 10 passing:
 | 8 | After lock, picks become readable by other users | PASS |
 | 9 | After lock, the owner can no longer edit | PASS — 0 rows |
 | 10 | After lock, the owner cannot add a new pick | PASS — 42501 |
+| 11 | A signed-out visitor cannot read `terms_accepted_at` from a profile | PASS — 42501 |
+| 12 | A signed-out visitor can read display names for the public board | PASS |
 
 Test 7 exists because the fix for test 6 — revoking UPDATE on `picks` and
 re-granting only `total_pick` and `spread_pick` — is exactly the kind of
@@ -30,6 +32,11 @@ change that silently breaks the write path it is meant to narrow.
 Test 9 counts affected rows through a CTE rather than reading RETURNING output.
 A blocked UPDATE returns no rows, which looks identical to a statement that ran
 and matched nothing.
+
+Tests 11 and 12 are a pair. The public leaderboard needs anon to read display
+names, and 0012 grants exactly three columns to do it. Test 11 proves the
+column grant is load-bearing; test 12 proves it did not overshoot and blank
+the board.
 
 ## scoring.sql
 

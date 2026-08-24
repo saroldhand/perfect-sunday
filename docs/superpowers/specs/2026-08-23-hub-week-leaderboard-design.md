@@ -246,6 +246,32 @@ is the assertion that 0012 widened profiles and nothing else.
 
 `supabase/tests/README.md` gets both new rows.
 
+## 9a. Amendments made during implementation
+
+Recorded on 2026-08-23, after the branch was built and reviewed. The spec is
+the binding document, so where the delivered code fell short of it, that is
+written here rather than left as a silent disagreement.
+
+**Deferred from §5 and §7.** Four items this document promised were not built:
+
+| Promised | Why it was deferred |
+|---|---|
+| Share button on the hub, in the `open`-complete and `locked` states | The deck's review screen already ships a working share of the same picks, so the growth loop this served is not blocked — only its second entry point is missing. |
+| Countdown to first kickoff on the `locked` hub | `countdownTo` hardcodes a "to lock" label and has other callers; changing it belonged in the feature work, not in a final fix wave. |
+| Board position on the `scored` hub | One number, and the hub already links straight to the full board. |
+| Pinning your own row into view on the leaderboard when it falls below the fold | Meaningless at the current scale of two players. The highlight shipped; the scroll behaviour did not. |
+
+None is load-bearing for the loop the branch set out to close. All four remain
+worth building, and this table is the record that they are owed.
+
+**One security consequence §8 did not state.** Because `picks` becomes readable
+by anyone after a week locks (`picks_select_after_lock`, unchanged by this
+work), granting anon the `display_name` column means a signed-out visitor can
+now *attribute* those post-lock picks to a named player, where before they
+could read the picks but not the names. Pre-lock behaviour is unchanged and
+still verified by test 3. This is a consequence of the public board that was
+chosen deliberately, but it was not spelled out above and should have been.
+
 ## 10. Out of scope
 
 Deliberately not in this piece of work:
