@@ -286,9 +286,13 @@ Deliberately not in this piece of work:
 
 Recorded so they are not mistaken for regressions:
 
-- `supabase/OPERATIONS.md` hardcodes `week_id = 1` in steps 3, 4, and the
+- ~~`supabase/OPERATIONS.md` hardcodes `week_id = 1` in steps 3, 4, and the
   demo reset. The live week is **id 2**, so those statements silently affect
-  nothing. Small fix, separate change.
+  nothing. Small fix, separate change.~~ **Fixed 2026-08-24.** Every statement
+  in that doc now resolves the week by `(season, week_number)`, the form steps
+  1 and 2 already used, so no literal id can go stale again. The demo reset was
+  additionally scoped to the week — it had been clearing `total_correct` and
+  `spread_correct` on every pick in every week.
 - `teams` has 32 rows and zero populated records, so the deck hides the
   record and PPG line by design. Cards look emptier than intended.
 - The rules page posts a $1,000 prize against roughly 1-in-665-million odds

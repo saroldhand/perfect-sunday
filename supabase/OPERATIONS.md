@@ -7,6 +7,17 @@ timer — the logic does not change, only what triggers it.
 All three live in the `private` schema, which PostgREST does not expose. There
 is no REST endpoint for them, so a signed-in user cannot reach them.
 
+## Naming the week
+
+Every statement below identifies the week by `(season, week_number)` and never
+by a literal `weeks.id`.
+
+`weeks.id` is `generated always as identity`, so it is whatever the sequence
+handed out — it is not stably 1, and re-seeding a week keeps the row's original
+id rather than resetting it. A statement filtered on a guessed id does not
+error; it matches nothing and reports success, which is the worst way for an
+operator step to fail. Substitute the season and week number, not an id.
+
 ## 1. Open the week
 
 Picks are writable only while `weeks.status = 'open'` — that is enforced by RLS,
@@ -43,11 +54,22 @@ from a box score.
 
 ```sql
 -- Week 18 demo slate: external_ids are '2025-18-AWAY-HOME'.
-select private.set_final_score(1, '2025-18-CAR-TB',  home_score, away_score);
-select private.set_final_score(1, '2025-18-SEA-SF',  home_score, away_score);
--- ...
+-- One row per finished game. The numbers below are placeholders — replace them
+-- with the real box score.
+with wk as (
+  select id from public.weeks where season = 2025 and week_number = 18
+)
+select private.set_final_score(wk.id, v.external_id, v.home_score, v.away_score)
+from wk
+cross join (values
+  ('2025-18-CAR-TB', 17, 24),
+  ('2025-18-SEA-SF', 20, 13)
+  -- ...
+) as v (external_id, home_score, away_score);
 
-select * from private.score_week(1);
+select * from private.score_week(
+  (select id from public.weeks where season = 2025 and week_number = 18)
+);
 ```
 
 `score_week` grades every game currently marked final, recomputes each entry's
@@ -81,7 +103,8 @@ Winner detection is a flag, never an automatic payout.
 select p.display_name, e.correct_count, e.picks_possible
 from public.entries e
 join public.profiles p on p.id = e.user_id
-where e.week_id = 1 and e.is_perfect;
+join public.weeks w on w.id = e.week_id
+where w.season = 2025 and w.week_number = 18 and e.is_perfect;
 ```
 
 If this ever returns a row, handle the prize manually. Multiple winners split
@@ -93,11 +116,26 @@ liability at exactly the posted amount regardless of entry volume.
 To replay the demo week from scratch:
 
 ```sql
-update public.picks set total_correct = null, spread_correct = null;
-delete from public.entries where week_id = 1;
+update public.picks p set total_correct = null, spread_correct = null
+from public.games g, public.weeks w
+where p.game_id = g.id and g.week_id = w.id
+  and w.season = 2025 and w.week_number = 18;
+
+delete from public.entries
+where week_id = (select id from public.weeks
+                 where season = 2025 and week_number = 18);
+
 update public.games set home_score = null, away_score = null, status = 'scheduled'
-where week_id = 1;
-update public.weeks set status = 'open' where id = 1;
+where week_id = (select id from public.weeks
+                 where season = 2025 and week_number = 18);
+
+update public.weeks set status = 'open'
+where season = 2025 and week_number = 18;
 ```
 
 This keeps everyone's picks and rewinds everything else.
+
+The first statement is scoped to the week through `games`. An unscoped
+`update public.picks set total_correct = null` would clear the grades on every
+week ever played, which is invisible while one week exists and destructive the
+moment a second one does.
