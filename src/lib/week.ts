@@ -89,15 +89,63 @@ export async function getGames(weekId: number): Promise<Game[]> {
   return (data ?? []) as Game[];
 }
 
-export async function getTeams(): Promise<Record<string, Team>> {
-  const { data, error } = await supabase
-    .from("teams")
-    .select(
-      "abbr, name, primary_color, wins, losses, ties, ppg, papg, updated_through_week, stats_season",
-    );
+/** Everything a card needs to name a club. Without these there is no UI. */
+const TEAM_CORE = "abbr, name, primary_color";
 
-  if (error) throw new Error(error.message);
-  return Object.fromEntries(((data ?? []) as Team[]).map((t) => [t.abbr, t]));
+/**
+ * The stat line. Decorative — the card hides it when it is absent — and the
+ * newest of them, stats_season, arrives in migration 0013.
+ */
+const TEAM_STATS = "wins, losses, ties, ppg, papg, updated_through_week, stats_season";
+
+/** PostgREST surfaces Postgres SQLSTATE 42703, undefined_column, verbatim. */
+const UNDEFINED_COLUMN = "42703";
+
+/**
+ * Teams, with the stat columns treated as optional.
+ *
+ * The frontend deploys from CI on every push to main; migrations are applied
+ * by hand. So there is always a window where the built app asks for a column
+ * the database does not have yet, and this query is the one that hit it —
+ * selecting stats_season before 0013 was applied failed the whole read, and
+ * because WeekProvider wraps every tabbed screen, one decorative column took
+ * down the entire app with "Something went wrong".
+ *
+ * A missing stat line is not a reason to lose the product. The full select is
+ * tried first and is what runs once the migration lands; an undefined column
+ * falls back to the core fields and leaves the stats blank, which the card
+ * already knows how to render. Any other error is real and still throws.
+ */
+export async function getTeams(): Promise<Record<string, Team>> {
+  const full = await supabase.from("teams").select(`${TEAM_CORE}, ${TEAM_STATS}`);
+  if (!full.error) return byAbbr(full.data ?? []);
+  if (full.error.code !== UNDEFINED_COLUMN) throw new Error(full.error.message);
+
+  const core = await supabase.from("teams").select(TEAM_CORE);
+  if (core.error) throw new Error(core.error.message);
+  return byAbbr(core.data ?? []);
+}
+
+/**
+ * Fills in whatever the fallback select did not return. The zeroes are never
+ * shown: the card keys the stat line off provenance, which stays null here.
+ */
+function byAbbr(rows: Record<string, unknown>[]): Record<string, Team> {
+  return Object.fromEntries(
+    rows.map((row) => {
+      const team: Team = {
+        wins: 0,
+        losses: 0,
+        ties: 0,
+        ppg: null,
+        papg: null,
+        updated_through_week: null,
+        stats_season: null,
+        ...(row as Partial<Team>),
+      } as Team;
+      return [team.abbr, team];
+    }),
+  );
 }
 
 /**
