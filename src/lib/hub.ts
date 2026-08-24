@@ -40,9 +40,11 @@ export function hubView(input: HubInput): HubView {
 
   if (!week) return { kind: "no-week" };
 
-  // A week with no slate is upcoming whatever its status column says. Picks
-  // open only once every game has a posted line.
-  if (week.status === "upcoming" || totalGames === 0) {
+  // An open week with no slate is upcoming: there is nothing to pick yet.
+  // Deliberately NOT applied to locked or scored — a finished week with no
+  // games rows is a database inconsistency, and hiding it behind "lines drop
+  // Tuesday" would throw away the user's result rather than surface a problem.
+  if (week.status === "upcoming" || (week.status === "open" && totalGames === 0)) {
     return { kind: "upcoming", week };
   }
 

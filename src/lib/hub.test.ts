@@ -103,4 +103,19 @@ describe("hubView", () => {
     const view = hubView({ week: week("open"), totalGames: 0, completed: 0, entry: null });
     expect(view.kind).toBe("upcoming");
   });
+
+  it("does not disguise a locked week with no games as upcoming", () => {
+    const view = hubView({ week: week("locked"), totalGames: 0, completed: 0, entry: null });
+    expect(view).toMatchObject({ kind: "locked", totalGames: 0 });
+  });
+
+  it("still reports a scored week's result when the slate is empty", () => {
+    const view = hubView({
+      week: week("scored"),
+      totalGames: 0,
+      completed: 0,
+      entry: entry({ correct_count: 21 }),
+    });
+    expect(view).toMatchObject({ kind: "scored", correct: 21, possible: 32 });
+  });
 });
