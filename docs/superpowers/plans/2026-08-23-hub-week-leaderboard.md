@@ -306,7 +306,7 @@ where table_schema = 'public' and table_name = 'profiles'
 group by grantee order by grantee;
 ```
 
-Expected: `anon` → `avatar_url, display_name, id` and nothing else. `authenticated` → all seven columns.
+Expected: `anon` → `avatar_url, display_name, id` and nothing else. `authenticated` → all six columns of the table, unchanged.
 
 - [ ] **Step 4: Add the two negative-case tests**
 
