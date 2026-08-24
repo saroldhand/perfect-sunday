@@ -27,11 +27,11 @@ export function ProgressBar({ total, currentIndex, isComplete, onJump }: Props) 
             className="group flex-1 py-3"
           >
             <span
-              className={`block h-[3px] w-full rounded-full transition-colors duration-[120ms] ${
+              className={`block h-[4px] w-full rounded-full transition-colors duration-[120ms] ${
                 current
-                  ? "bg-[var(--color-accent)]"
+                  ? "bg-[linear-gradient(90deg,#ffd44d,#ff7a1a)]"
                   : done
-                    ? "bg-[var(--color-text-muted)]"
+                    ? "bg-[rgba(255,180,36,0.45)]"
                     : "bg-[var(--color-border)]"
               }`}
             />

@@ -26,10 +26,7 @@ export default function MyWeek() {
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
           Sign in to see your picks.
         </p>
-        <Link
-          href="/"
-          className="mt-6 flex min-h-14 w-full items-center justify-center rounded-[var(--radius-target)] bg-[var(--color-accent)] px-4 text-base font-semibold text-[#0B0D10]"
-        >
+        <Link href="/" className="btn btn-gold mt-6">
           Sign in
         </Link>
       </>
@@ -57,7 +54,11 @@ export default function MyWeek() {
 
   return (
     <>
-      <Title>Week {week.week_number}</Title>
+      <p className="eyebrow mb-2">
+        Week {week.week_number}
+        {graded ? " · Final" : week.status === "locked" ? " · Locked" : " · Open"}
+      </p>
+      <Title>Your slate</Title>
       <p className="mt-2 text-sm text-[var(--color-text-muted)]">
         {graded ? (
           "Final. A push counts for both sides."
@@ -75,7 +76,7 @@ export default function MyWeek() {
 
       {/* Kickoff order, the same order as the deck and the share grid. It is
           what lets two people line their lists up row by row. */}
-      <ul className="mt-5 divide-y divide-[var(--color-border)] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+      <ul className="card mt-5 divide-y divide-[var(--color-border)]">
         {games.map((game, index) => {
           const result = results[game.id];
           return (
@@ -100,10 +101,7 @@ export default function MyWeek() {
       </ul>
 
       {week.status === "open" && (
-        <Link
-          href="/picks"
-          className="mt-6 flex min-h-14 w-full items-center justify-center rounded-[var(--radius-target)] bg-[var(--color-accent)] px-4 text-base font-semibold text-[#0B0D10]"
-        >
+        <Link href="/picks" className="btn btn-gold mt-6">
           {picked === games.length ? "Change a pick" : "Finish your picks"}
         </Link>
       )}
@@ -113,7 +111,7 @@ export default function MyWeek() {
 
 function Title({ children }: { children: React.ReactNode }) {
   return (
-    <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold uppercase tracking-tight">
+    <h1 className="font-[family-name:var(--font-display)] text-4xl font-extrabold uppercase tracking-tight">
       {children}
     </h1>
   );
@@ -122,9 +120,9 @@ function Title({ children }: { children: React.ReactNode }) {
 function Skeleton() {
   return (
     <div aria-hidden>
-      <div className="h-9 w-1/2 rounded bg-[var(--color-surface)]" />
-      <div className="mt-3 h-4 w-2/3 rounded bg-[var(--color-surface)]" />
-      <div className="mt-5 h-96 rounded-[var(--radius-card)] bg-[var(--color-surface)]" />
+      <div className="h-9 w-1/2 animate-pulse rounded bg-[var(--color-surface)]" />
+      <div className="mt-3 h-4 w-2/3 animate-pulse rounded bg-[var(--color-surface)]" />
+      <div className="card mt-5 h-96 animate-pulse" />
     </div>
   );
 }

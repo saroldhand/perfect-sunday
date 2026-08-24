@@ -45,17 +45,13 @@ export function ReviewScreen({
   if (locked) {
     return (
       <div className="py-6">
-        <h2 className="font-[family-name:var(--font-display)] text-3xl font-bold uppercase tracking-tight">
-          Picks are in
+        <h2 className="wordmark text-5xl">
+          Picks <span className="text-gold">are in</span>
         </h2>
-        <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+        <p className="mt-3 text-sm text-[var(--color-text-muted)]">
           All {games.length * 2} of them. Nothing to do now but wait.
         </p>
-        <button
-          type="button"
-          onClick={share}
-          className="mt-6 min-h-14 w-full rounded-[var(--radius-target)] bg-[var(--color-accent)] px-4 text-base font-semibold text-[#0B0D10]"
-        >
+        <button type="button" onClick={share} className="btn btn-gold mt-6">
           Share your picks
         </button>
         {toast && (
@@ -69,7 +65,7 @@ export function ReviewScreen({
 
   return (
     <div className="py-6">
-      <h2 className="font-[family-name:var(--font-display)] text-2xl font-bold uppercase tracking-tight">
+      <h2 className="font-[family-name:var(--font-display)] text-3xl font-extrabold uppercase tracking-tight">
         Review
       </h2>
       <p className="mt-2 text-sm text-[var(--color-text-muted)]">
@@ -78,7 +74,7 @@ export function ReviewScreen({
           : `${missing.length} game${missing.length === 1 ? "" : "s"} still to pick.`}
       </p>
 
-      <ul className="mt-5 divide-y divide-[var(--color-border)] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+      <ul className="card mt-5 divide-y divide-[var(--color-border)]">
         {games.map((game, index) => (
           <PickSummaryRow
             key={game.id}
@@ -94,7 +90,7 @@ export function ReviewScreen({
         type="button"
         disabled={!allIn || locking}
         onClick={onLock}
-        className="mt-6 min-h-14 w-full rounded-[var(--radius-target)] bg-[var(--color-accent)] px-4 text-base font-semibold text-[#0B0D10] disabled:opacity-40"
+        className="btn btn-gold mt-6"
       >
         {locking ? "Locking in…" : "Lock in picks"}
       </button>

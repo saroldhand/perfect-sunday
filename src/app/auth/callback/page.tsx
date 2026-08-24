@@ -57,17 +57,14 @@ export default function AuthCallback() {
   if (linkError || session.status === "signed-out") {
     return (
       <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12">
-        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold uppercase tracking-tight">
+        <h1 className="font-[family-name:var(--font-display)] text-4xl font-extrabold uppercase tracking-tight">
           That link did not work
         </h1>
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
           {linkError ??
             "Sign-in links are single use and expire. Open the newest one on the same device you asked for it from."}
         </p>
-        <Link
-          href="/"
-          className="mt-6 flex min-h-14 items-center justify-center rounded-[var(--radius-target)] bg-[var(--color-accent)] px-4 text-base font-semibold text-[#0B0D10]"
-        >
+        <Link href="/" className="btn btn-gold mt-6">
           Send a new link
         </Link>
       </main>

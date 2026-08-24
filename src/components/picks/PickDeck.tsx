@@ -196,16 +196,16 @@ export function PickDeck({ userId, week, games, teams, initialPicks }: Props) {
 
       {!onReview && (
         <footer
-          className="sticky bottom-0 bg-[var(--color-bg)] pt-2"
+          className="sticky bottom-0 bg-[var(--color-bg)]/90 pt-2 backdrop-blur-md"
           style={{ paddingBottom: "max(1rem, env(safe-area-inset-bottom))" }}
         >
           <button
             type="button"
             onClick={() => goTo(games.length)}
-            className="min-h-12 w-full rounded-[var(--radius-target)] border border-[var(--color-border)] text-sm font-medium text-[var(--color-text-muted)]"
+            className="min-h-12 w-full rounded-[var(--radius-target)] border border-[var(--color-border)] bg-[var(--color-surface)] text-sm font-medium text-[var(--color-text-muted)]"
           >
-            <span className="tabular">{completed}</span> of {games.length} games
-            picked · Review
+            <span className="tabular font-semibold text-[var(--color-text)]">{completed}</span> of{" "}
+            {games.length} games picked · Review
           </button>
         </footer>
       )}

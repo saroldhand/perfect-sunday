@@ -4,6 +4,8 @@ import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { absoluteUrl } from "@/lib/urls";
 import { GOOGLE_AUTH_ENABLED } from "@/lib/constants";
+import { useWeek } from "@/components/app/WeekProvider";
+import { formatTotal, lineFor } from "@/lib/format";
 
 type SendState =
   | { status: "idle" }
@@ -12,6 +14,7 @@ type SendState =
   | { status: "error"; message: string };
 
 export function SignInForm() {
+  const { games } = useWeek();
   const [email, setEmail] = useState("");
   const [send, setSend] = useState<SendState>({ status: "idle" });
 
@@ -33,7 +36,7 @@ export function SignInForm() {
   if (send.status === "sent") {
     return (
       <Shell>
-        <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold uppercase tracking-tight">
+        <h1 className="font-[family-name:var(--font-display)] text-4xl font-extrabold uppercase tracking-tight">
           Check your email
         </h1>
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
@@ -52,17 +55,36 @@ export function SignInForm() {
     );
   }
 
+  const pickCount = games.length * 2;
+
   return (
     <Shell>
-      <h1 className="font-[family-name:var(--font-display)] text-4xl font-bold uppercase tracking-tight">
-        Perfect Sunday
+      <LineTicker />
+
+      <h1 className="wordmark rise mt-6 text-[4.5rem]">
+        Perfect
+        <br />
+        <span className="text-gold">Sunday</span>
       </h1>
-      <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+
+      <p className="rise rise-2 mt-5 text-sm leading-relaxed text-[var(--color-text-muted)]">
         Pick every over/under and every spread on the slate. Get them all right
-        and win the prize. Nobody will.
+        and win the prize.{" "}
+        <span className="font-semibold whitespace-nowrap text-[var(--color-accent)]">
+          Nobody will.
+        </span>
       </p>
 
-      <form onSubmit={sendLink} className="mt-8">
+      <ul className="rise rise-3 mt-5 flex gap-2">
+        <StatChip
+          value={pickCount > 0 ? String(pickCount) : "Every"}
+          label={pickCount > 0 ? "picks" : "game"}
+        />
+        <StatChip value="1" label="perfect run" />
+        <StatChip value="$0" label="to enter" />
+      </ul>
+
+      <form onSubmit={sendLink} className="rise rise-4 mt-8">
         <label
           htmlFor="email"
           className="block text-xs font-medium uppercase tracking-widest text-[var(--color-text-muted)]"
@@ -84,7 +106,7 @@ export function SignInForm() {
         <button
           type="submit"
           disabled={send.status === "sending" || email.trim() === ""}
-          className="mt-4 min-h-14 w-full rounded-[var(--radius-target)] bg-[var(--color-accent)] px-4 text-base font-semibold text-[#0B0D10] transition-colors duration-[120ms] disabled:opacity-40"
+          className="btn btn-gold mt-4"
         >
           {send.status === "sending" ? "Sending…" : "Email me a sign-in link"}
         </button>
@@ -108,7 +130,7 @@ export function SignInForm() {
               options: { redirectTo: absoluteUrl("/auth/callback/") },
             })
           }
-          className="mt-3 min-h-14 w-full rounded-[var(--radius-target)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-base font-semibold"
+          className="btn btn-ghost mt-3"
         >
           Continue with Google
         </button>
@@ -118,6 +140,65 @@ export function SignInForm() {
         No passwords, no deposit, no payment. Free to enter.
       </p>
     </Shell>
+  );
+}
+
+/**
+ * The week's real lines scrolling past, sportsbook-board style. Content is the
+ * hook: a first-time visitor sees actual numbers to beat, not marketing. Games
+ * without posted lines are skipped rather than shown as dashes.
+ */
+function LineTicker() {
+  const { games } = useWeek();
+  const items = games
+    .filter((g) => g.spread !== null || g.total !== null)
+    .map((g) => ({
+      id: g.id,
+      matchup: `${g.away_team} @ ${g.home_team}`,
+      line: g.spread !== null ? `${g.home_team} ${lineFor(g.spread, "home")}` : null,
+      total: g.total !== null ? `O/U ${formatTotal(g.total)}` : null,
+    }));
+
+  if (items.length === 0) return null;
+
+  const strip = (
+    <>
+      {items.map((item) => (
+        <span
+          key={item.id}
+          className="flex shrink-0 items-baseline gap-2 pr-8 text-xs whitespace-nowrap"
+        >
+          <span className="font-[family-name:var(--font-display)] text-sm font-bold uppercase">
+            {item.matchup}
+          </span>
+          {item.line && <span className="tabular text-[var(--color-accent)]">{item.line}</span>}
+          {item.total && <span className="tabular text-[var(--color-text-muted)]">{item.total}</span>}
+        </span>
+      ))}
+    </>
+  );
+
+  return (
+    <div className="ticker rise -mx-4" aria-hidden>
+      {/* The strip twice over: the loop point lands exactly at -50%. */}
+      <div className="ticker-track py-2">
+        {strip}
+        {strip}
+      </div>
+    </div>
+  );
+}
+
+function StatChip({ value, label }: { value: string; label: string }) {
+  return (
+    <li className="flex flex-1 flex-col items-center rounded-[var(--radius-target)] border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5">
+      <span className="tabular font-[family-name:var(--font-display)] text-2xl font-extrabold leading-none">
+        {value}
+      </span>
+      <span className="mt-1 text-[10px] font-medium uppercase tracking-widest text-[var(--color-text-muted)]">
+        {label}
+      </span>
+    </li>
   );
 }
 

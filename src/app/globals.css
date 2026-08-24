@@ -1,28 +1,32 @@
 @import "tailwindcss";
 
-/* Palette from SPEC.md §8. Dark is the only theme — this is a sports product
-   and the result states need to carry the colour without competing with the
-   chrome. */
-@theme {
-  --color-bg: #0b0d10;
-  --color-surface: #15181d;
-  --color-surface-raised: #1e232a;
-  --color-border: #272d35;
-  --color-text: #f2f4f7;
-  --color-text-muted: #8a929e;
-  --color-accent: #f5c518;
+/* "Night game" palette. Not neutral black — a deep stadium navy under warm
+   floodlight, so the page reads as a broadcast, not a terminal. Gold is the
+   brand; the sunset-orange end of it appears only inside gradients. */
+/* `static` because several of these are consumed only through var() in the
+   component classes below — without it Tailwind tree-shakes them out of :root
+   and font-display silently falls back to the system stack. */
+@theme static {
+  --color-bg: #070b15;
+  --color-surface: #0d1526;
+  --color-surface-raised: #16213a;
+  --color-border: #253352;
+  --color-text: #f5f7fc;
+  --color-text-muted: #93a1bd;
+  --color-accent: #ffb424;
+  --color-accent-deep: #ff7a1a;
 
   /* Reserved exclusively for pick outcomes. Never use these for buttons,
      links, or decoration — their only job is to mean right or wrong, and that
      meaning has to stay uncontaminated. */
-  --color-correct: #2fbf71;
-  --color-wrong: #e5484d;
+  --color-correct: #33d67d;
+  --color-wrong: #ff4d57;
 
-  --font-display: var(--font-oswald), "Arial Narrow", sans-serif;
+  --font-display: var(--font-big-shoulders), "Arial Narrow", sans-serif;
   --font-sans: var(--font-inter), system-ui, sans-serif;
 
-  --radius-card: 12px;
-  --radius-target: 8px;
+  --radius-card: 14px;
+  --radius-target: 10px;
 }
 
 html {
@@ -44,8 +48,193 @@ body {
   font-feature-settings: "tnum";
 }
 
-/* Motion is almost absent by design, so the one moment that does move — a card
-   resolving green or red during a live week — actually lands. */
+@layer components {
+  /* Floodlight atmosphere: one warm glow from above the stadium, one cold
+     blue answer from below. Rendered by a fixed element in the root layout so
+     iOS does not scroll it away. */
+  .floodlight {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(120% 55% at 50% -12%, rgba(255, 173, 36, 0.16), transparent 60%),
+      radial-gradient(90% 50% at 88% 110%, rgba(56, 108, 255, 0.12), transparent 60%);
+  }
+
+  /* The brand device: condensed 900-weight caps on an -8° slant, the second
+     word poured in gold. Skew lives here and on eyebrow tabs only — body text
+     never leans. */
+  .wordmark {
+    font-family: var(--font-display);
+    font-weight: 900;
+    text-transform: uppercase;
+    line-height: 0.86;
+    letter-spacing: 0.01em;
+    transform: skewX(-8deg);
+  }
+
+  .text-gold {
+    background: linear-gradient(115deg, #ffd44d 5%, #ffb424 45%, #ff7a1a 95%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Eyebrow label with the angled gold tab in front. */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+  }
+  .eyebrow::before {
+    content: "";
+    width: 14px;
+    height: 9px;
+    flex-shrink: 0;
+    transform: skewX(-18deg);
+    background: linear-gradient(115deg, #ffd44d, #ff7a1a);
+  }
+
+  .btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 3.5rem;
+    width: 100%;
+    padding: 0 1rem;
+    font-size: 1rem;
+    font-weight: 700;
+    border-radius: var(--radius-target);
+    transition:
+      transform 120ms ease,
+      opacity 120ms ease;
+  }
+  .btn:active {
+    transform: scale(0.98);
+  }
+  .btn:disabled {
+    opacity: 0.4;
+  }
+
+  /* Primary action: gold pour, notched corner, floodlit shadow. drop-shadow
+     instead of box-shadow because clip-path would cut a box-shadow off. */
+  .btn-gold {
+    background: linear-gradient(115deg, #ffd44d 0%, #ffb424 40%, #ff7a1a 100%);
+    color: #140f06;
+    clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+    filter: drop-shadow(0 10px 22px rgba(255, 138, 26, 0.32));
+  }
+
+  .btn-ghost {
+    border: 1px solid var(--color-border);
+    background: var(--color-surface);
+    color: var(--color-text);
+  }
+
+  .card {
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%),
+      var(--color-surface);
+  }
+
+  /* The hub's hero: a broadcast billboard. Warm light leaks in from above a
+     gold hairline that fades out at both ends, like a lower-third graphic. */
+  .billboard {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-card);
+    padding: 1.5rem 1.25rem;
+    background:
+      radial-gradient(140% 90% at 50% -30%, rgba(255, 180, 36, 0.14), transparent 55%),
+      linear-gradient(180deg, #131d33, #0d1526);
+  }
+  .billboard::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background: linear-gradient(90deg, transparent, #ffd44d 18%, #ff7a1a 82%, transparent);
+  }
+
+  /* Scrolling line ticker on the signed-out hero. The track holds the item
+     list twice; sliding -50% loops seamlessly. */
+  .ticker {
+    overflow: hidden;
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  }
+  .ticker-track {
+    display: flex;
+    width: max-content;
+    animation: ticker-scroll 36s linear infinite;
+  }
+
+  /* Orchestrated entrance: hero pieces rise in sequence on load. */
+  .rise {
+    animation: rise 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+  .rise-2 {
+    animation-delay: 80ms;
+  }
+  .rise-3 {
+    animation-delay: 160ms;
+  }
+  .rise-4 {
+    animation-delay: 240ms;
+  }
+
+  /* A pick registering is the product's one tactile moment. */
+  .pick-option[aria-pressed="true"] {
+    animation: pop 180ms ease-out;
+  }
+}
+
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+/* Animates the independent `translate` property, not `transform`: with
+   fill-mode both, a transform keyframe would permanently override the
+   wordmark's skew after the animation settles. */
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 14px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+@keyframes pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Motion is deliberate and scarce, so it all has to honour this. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

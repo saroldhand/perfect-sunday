@@ -29,7 +29,7 @@ export function TabBar() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 border-t border-[var(--color-border)] bg-[var(--color-bg)]"
+      className="fixed inset-x-0 bottom-0 border-t border-[var(--color-border)] bg-[rgba(9,14,26,0.88)] backdrop-blur-md"
       style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom))" }}
     >
       <ul className="mx-auto flex w-full max-w-md">
@@ -40,13 +40,23 @@ export function TabBar() {
               <Link
                 href={tab.href}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-14 items-center justify-center text-xs font-medium uppercase tracking-widest ${
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 text-xs font-semibold uppercase tracking-widest ${
                   active
                     ? "text-[var(--color-accent)]"
                     : "text-[var(--color-text-muted)]"
                 }`}
               >
                 {tab.label}
+                {/* The angled gold slash under the active tab: the brand
+                    device doing the state's job, not a decoration. */}
+                <span
+                  aria-hidden
+                  className={`h-[3px] w-5 skew-x-[-18deg] ${
+                    active
+                      ? "bg-[linear-gradient(115deg,#ffd44d,#ff7a1a)]"
+                      : "bg-transparent"
+                  }`}
+                />
               </Link>
             </li>
           );

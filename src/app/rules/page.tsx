@@ -16,14 +16,12 @@ export default function Rules() {
         Back
       </Link>
 
-      <h1 className="mt-6 font-[family-name:var(--font-display)] text-3xl font-bold uppercase tracking-tight">
+      <h1 className="mt-6 font-[family-name:var(--font-display)] text-4xl font-extrabold uppercase tracking-tight">
         Official Rules
       </h1>
-      <p className="mt-2 text-xs uppercase tracking-widest text-[var(--color-text-muted)]">
-        Version {TERMS_VERSION}
-      </p>
+      <p className="eyebrow mt-3">Version {TERMS_VERSION}</p>
 
-      <div className="mt-6 rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-5">
+      <div className="card mt-6 p-5">
         <p className="text-sm text-[var(--color-text-muted)]">
           <span className="text-[var(--color-text)]">Draft.</span> Perfect Sunday
           is currently a private test among friends. These rules are an outline,

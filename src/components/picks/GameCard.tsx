@@ -26,18 +26,19 @@ export function GameCard({
   const home = teams[game.home_team];
 
   return (
-    <article
-      className={`rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)] p-4 ${
-        disabled ? "opacity-40" : ""
-      }`}
-    >
-      <p className="mb-3 text-xs uppercase tracking-widest text-[var(--color-text-muted)]">
+    <article className={`card p-4 ${disabled ? "opacity-40" : ""}`}>
+      <p className="eyebrow mb-3">
         {formatKickoff(game.kickoff_at)}
         {disabled && " · kicked off"}
       </p>
 
       <TeamBand team={away} />
-      <div className="my-2" />
+      <p
+        aria-hidden
+        className="my-1.5 pl-4 text-[10px] font-semibold uppercase tracking-widest text-[var(--color-text-muted)]"
+      >
+        at
+      </p>
       <TeamBand team={home} />
 
       {/* Total first, then spread — same order the share grid uses, so the
@@ -93,12 +94,19 @@ function TeamBand({ team }: { team?: Team }) {
   // which reads as a real record rather than missing data.
   const hasStats = team.updated_through_week !== null;
 
+  const color = accentColor(team.primary_color);
+
   return (
     <div
-      className="flex items-baseline gap-3 rounded-[var(--radius-target)] bg-[var(--color-surface-raised)] py-3 pr-3 pl-3"
-      style={{ borderLeft: `3px solid ${accentColor(team.primary_color)}` }}
+      className="flex items-baseline gap-3 rounded-[var(--radius-target)] py-3 pr-3 pl-3"
+      style={{
+        borderLeft: `4px solid ${color}`,
+        // The club's colour as a wash fading out to the right — the matchup
+        // graphic treatment, not a hairline that apologises for itself.
+        background: `linear-gradient(90deg, ${color}2E, ${color}05 65%), var(--color-surface-raised)`,
+      }}
     >
-      <span className="font-[family-name:var(--font-display)] text-3xl font-bold uppercase leading-none">
+      <span className="font-[family-name:var(--font-display)] text-4xl font-black uppercase leading-none">
         {team.abbr}
       </span>
       <span className="text-sm text-[var(--color-text-muted)]">{team.name}</span>
@@ -146,14 +154,14 @@ function PickRow({
               disabled={disabled}
               aria-pressed={isSelected}
               onClick={() => onSelect(option.value)}
-              className={`flex min-h-14 flex-col items-center justify-center rounded-[var(--radius-target)] border transition-colors duration-[120ms] ${
+              className={`pick-option flex min-h-14 flex-col items-center justify-center rounded-[var(--radius-target)] border transition-colors duration-[120ms] ${
                 isSelected
-                  ? "border-[var(--color-accent)] bg-[var(--color-surface-raised)]"
-                  : "border-[var(--color-border)] bg-transparent"
+                  ? "border-[var(--color-accent)] bg-[rgba(255,180,36,0.10)]"
+                  : "border-[var(--color-border)] bg-[var(--color-surface-raised)]/40"
               }`}
             >
               <span
-                className={`font-[family-name:var(--font-display)] text-lg font-semibold uppercase leading-none ${
+                className={`font-[family-name:var(--font-display)] text-xl font-bold uppercase leading-none ${
                   isSelected ? "text-[var(--color-accent)]" : ""
                 }`}
               >

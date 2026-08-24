@@ -56,6 +56,35 @@ export function countdownTo(iso: string, now: number): Countdown {
   return { expired: false, label: `${minutes}m to lock` };
 }
 
+export type Clock = {
+  expired: boolean;
+  days: number;
+  /** "HH:MM:SS" once under a day, "MM:SS" under an hour — the ticking form. */
+  clock: string;
+};
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * The hub's live countdown. Under a day it ticks in seconds — the sweat is
+ * the point — and above a day it leads with the day count instead, because
+ * "3d" plus a ticking clock reads as noise, not urgency.
+ */
+export function clockTo(iso: string, now: number): Clock {
+  const ms = new Date(iso).getTime() - now;
+  if (ms <= 0) return { expired: true, days: 0, clock: "00:00" };
+
+  const totalSeconds = Math.floor(ms / 1000);
+  const days = Math.floor(totalSeconds / 86_400);
+  const hours = Math.floor((totalSeconds % 86_400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (days > 0) return { expired: false, days, clock: `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` };
+  if (hours > 0) return { expired: false, days: 0, clock: `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` };
+  return { expired: false, days: 0, clock: `${pad(minutes)}:${pad(seconds)}` };
+}
+
 const LOCK_FORMAT = new Intl.DateTimeFormat("en-US", {
   weekday: "long",
   month: "short",

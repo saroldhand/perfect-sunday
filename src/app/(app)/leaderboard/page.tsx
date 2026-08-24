@@ -37,11 +37,13 @@ export default function Leaderboard() {
 
   return (
     <>
-      <Title>
-        {boardWeek
-          ? `Week ${boardWeek.week_number}${boardWeek.status === "scored" ? " final" : ""}`
-          : "Leaderboard"}
-      </Title>
+      {boardWeek && (
+        <p className="eyebrow mb-2">
+          Week {boardWeek.week_number}
+          {boardWeek.status === "scored" ? " · Final" : " · Live"}
+        </p>
+      )}
+      <Title>The board</Title>
 
       {!showsCurrent && week && (week.status === "open" || week.status === "upcoming") && (
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">
@@ -72,29 +74,33 @@ export default function Leaderboard() {
             : "No week has been played yet."}
         </p>
       ) : (
-        <ul className="mt-5 divide-y divide-[var(--color-border)] rounded-[var(--radius-card)] border border-[var(--color-border)] bg-[var(--color-surface)]">
+        <ul className="card mt-5 divide-y divide-[var(--color-border)]">
           {ranked.map((row) => {
             const mine = row.user_id === userId;
             return (
               <li
                 key={row.user_id}
                 className={`flex items-center gap-3 px-4 py-3 ${
-                  mine ? "bg-[var(--color-surface-raised)]" : ""
+                  mine
+                    ? "border-l-[3px] border-l-[var(--color-accent)] bg-[var(--color-surface-raised)] pl-[13px]"
+                    : ""
                 }`}
               >
-                <span className="tabular w-6 shrink-0 text-sm text-[var(--color-text-muted)]">
-                  {row.rank}
-                </span>
+                <RankMark rank={row.rank} />
                 <span className="min-w-0 flex-1 truncate text-sm text-[var(--color-text)]">
                   {row.display_name}
                   {mine && (
-                    <span className="ml-2 text-xs text-[var(--color-text-muted)]">you</span>
+                    <span className="ml-2 text-xs font-semibold uppercase tracking-widest text-[var(--color-accent)]">
+                      you
+                    </span>
                   )}
                 </span>
                 {showChips && <Chip perfect={row.is_perfect} alive={row.is_alive} />}
-                <span className="tabular w-14 shrink-0 text-right text-sm">
+                <span className="tabular w-14 shrink-0 text-right text-sm font-semibold">
                   {row.correct_count}
-                  <span className="text-[var(--color-text-muted)]">/{row.picks_possible}</span>
+                  <span className="font-normal text-[var(--color-text-muted)]">
+                    /{row.picks_possible}
+                  </span>
                 </span>
               </li>
             );
@@ -103,10 +109,7 @@ export default function Leaderboard() {
       )}
 
       {!signedIn && (
-        <Link
-          href="/"
-          className="mt-6 flex min-h-14 w-full items-center justify-center rounded-[var(--radius-target)] bg-[var(--color-accent)] px-4 text-base font-semibold text-[#0B0D10]"
-        >
+        <Link href="/" className="btn btn-gold mt-6">
           Sign in to play
         </Link>
       )}
@@ -114,10 +117,29 @@ export default function Leaderboard() {
   );
 }
 
+/**
+ * The top three ranks read like a podium — gold, silver, bronze numerals in
+ * the display face. Everyone below is a quiet number.
+ */
+function RankMark({ rank }: { rank: number }) {
+  const medal =
+    rank === 1 ? "#ffd44d" : rank === 2 ? "#c8d2e2" : rank === 3 ? "#d9995c" : null;
+  return (
+    <span
+      className={`tabular w-7 shrink-0 font-[family-name:var(--font-display)] text-lg leading-none ${
+        medal ? "font-extrabold" : "text-sm font-normal text-[var(--color-text-muted)]"
+      }`}
+      style={medal ? { color: medal } : undefined}
+    >
+      {rank}
+    </span>
+  );
+}
+
 function Chip({ perfect, alive }: { perfect: boolean; alive: boolean }) {
   if (perfect) {
     return (
-      <span className="shrink-0 text-xs font-semibold uppercase text-[var(--color-correct)]">
+      <span className="shrink-0 rounded-full bg-[linear-gradient(115deg,#ffd44d,#ff7a1a)] px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-[#140f06]">
         Perfect
       </span>
     );
@@ -136,7 +158,7 @@ function Chip({ perfect, alive }: { perfect: boolean; alive: boolean }) {
 
 function Title({ children }: { children: React.ReactNode }) {
   return (
-    <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold uppercase tracking-tight">
+    <h1 className="font-[family-name:var(--font-display)] text-4xl font-extrabold uppercase tracking-tight">
       {children}
     </h1>
   );
@@ -145,8 +167,8 @@ function Title({ children }: { children: React.ReactNode }) {
 function Skeleton() {
   return (
     <div aria-hidden>
-      <div className="h-9 w-1/2 rounded bg-[var(--color-surface)]" />
-      <div className="mt-5 h-40 rounded-[var(--radius-card)] bg-[var(--color-surface)]" />
+      <div className="h-9 w-1/2 animate-pulse rounded bg-[var(--color-surface)]" />
+      <div className="card mt-5 h-40 animate-pulse" />
     </div>
   );
 }

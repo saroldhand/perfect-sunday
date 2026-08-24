@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Oswald } from "next/font/google";
+import { Big_Shoulders, Inter } from "next/font/google";
 import "./globals.css";
 
-// Condensed grotesque for team codes and numbers — the things the eye scans.
-const oswald = Oswald({
-  variable: "--font-oswald",
+// Heavy American condensed for team codes, numerals, and headlines — the
+// broadcast voice of the product. Variable, so 900 is available for heroes
+// without shipping separate cuts; opsz keeps big sizes display-tight.
+const bigShoulders = Big_Shoulders({
+  variable: "--font-big-shoulders",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  axes: ["opsz"],
 });
 
 const inter = Inter({
@@ -40,7 +42,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0B0D10",
+  themeColor: "#070B15",
   // The pick targets are already far above 44pt; zoom stays enabled because
   // disabling it is an accessibility failure, not a polish detail.
   width: "device-width",
@@ -54,8 +56,15 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className={`${oswald.variable} ${inter.variable} antialiased`}>
+    // The font variable classes must sit on <html>, not <body>: the theme
+    // declares --font-display on :root, and a custom property is computed at
+    // the element that declares it — on :root, a var(--font-big-shoulders)
+    // defined only on <body> is invisible, and every descendant inherits the
+    // already-failed value. On <body> the display font silently never loads.
+    <html lang="en" className={`${bigShoulders.variable} ${inter.variable}`}>
+      <body className="antialiased">
+        {/* Fixed so iOS cannot scroll the stadium light away with the page. */}
+        <div aria-hidden className="floodlight" />
         {children}
       </body>
     </html>

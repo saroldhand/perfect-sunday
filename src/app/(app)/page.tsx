@@ -8,7 +8,7 @@ import { SignInForm } from "@/components/auth/SignInForm";
 import { landingRoute } from "@/lib/profile";
 import { hubView, type HubView, type Verdict } from "@/lib/hub";
 import { isGameComplete } from "@/lib/picks";
-import { countdownTo, formatLockTime } from "@/lib/format";
+import { clockTo, formatLockTime } from "@/lib/format";
 
 export default function Hub() {
   const { phase, error, signedIn, profile, week, games, results, boardWeek, boardEntries, userId } =
@@ -16,8 +16,10 @@ export default function Hub() {
   const router = useRouter();
   const [now, setNow] = useState(() => Date.now());
 
+  // One second, not thirty: the open-week countdown ticks live, and the sweat
+  // of a moving clock is exactly the pull this screen exists to create.
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30_000);
+    const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -56,9 +58,6 @@ export default function Hub() {
 
   return (
     <>
-      <p className="text-xs font-medium uppercase tracking-widest text-[var(--color-text-muted)]">
-        {profile.display_name}
-      </p>
       <Body view={view} now={now} />
       <Link
         href="/rules"
@@ -73,124 +72,169 @@ export default function Hub() {
 function Body({ view, now }: { view: HubView; now: number }) {
   if (view.kind === "no-week") {
     return (
-      <>
-        <Title>No week is open yet</Title>
+      <section className="billboard rise">
+        <p className="eyebrow">Preseason</p>
+        <Title>No slate yet</Title>
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
           The first slate has not been loaded. Check back before Sunday.
         </p>
-      </>
+      </section>
     );
   }
 
   if (view.kind === "upcoming") {
     return (
-      <>
-        <Title>Week {view.week.week_number} lines drop Tuesday</Title>
+      <section className="billboard rise">
+        <p className="eyebrow">Week {view.week.week_number}</p>
+        <Title>Lines drop Tuesday</Title>
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
           Every game needs a posted line before picks open. A number that moves
           after you pick against it is a broken promise.
         </p>
-        <p className="mt-6 text-xs text-[var(--color-text-muted)]">
+        <p className="tabular mt-6 text-xs uppercase tracking-widest text-[var(--color-text-muted)]">
           Locks {formatLockTime(view.week.locks_at)}
         </p>
-      </>
+      </section>
     );
   }
 
   if (view.kind === "open") {
-    const { label } = countdownTo(view.week.locks_at, now);
+    const clock = clockTo(view.week.locks_at, now);
+    const pct = view.totalGames === 0 ? 0 : Math.round((view.completed / view.totalGames) * 100);
     return (
-      <>
-        <Title>Week {view.week.week_number}</Title>
-        <p className="tabular mt-2 text-sm text-[var(--color-accent)]">{label}</p>
-        <p className="mt-6 text-sm text-[var(--color-text-muted)]">
-          {view.allIn ? (
-            <>
-              Every game picked. You can change any of them until{" "}
-              {formatLockTime(view.week.locks_at)}.
-            </>
-          ) : (
-            <>
-              <span className="tabular text-[var(--color-text)]">
-                {view.completed} of {view.totalGames}
-              </span>{" "}
-              games picked. A partial entry is not scored.
-            </>
-          )}
-        </p>
-        <Link
-          href="/picks"
-          className="mt-6 flex min-h-14 w-full items-center justify-center rounded-[var(--radius-target)] bg-[var(--color-accent)] px-4 text-base font-semibold text-[#0B0D10]"
-        >
+      <section className="billboard rise">
+        <p className="eyebrow">Week {view.week.week_number} · Picks open</p>
+        <div className="mt-4">
+          <TickingClock clock={clock.clock} days={clock.days} />
+          <p className="mt-1 text-xs uppercase tracking-widest text-[var(--color-text-muted)]">
+            Until lines lock · {formatLockTime(view.week.locks_at)}
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--color-border)]">
+            <div
+              className="h-full rounded-full bg-[linear-gradient(90deg,#ffd44d,#ff7a1a)] transition-[width] duration-300"
+              style={{ width: `${pct}%` }}
+            />
+          </div>
+          <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+            {view.allIn ? (
+              <>Every game picked. You can change any of them until the lock.</>
+            ) : (
+              <>
+                <span className="tabular font-semibold text-[var(--color-text)]">
+                  {view.completed} of {view.totalGames}
+                </span>{" "}
+                games picked. A partial entry is not scored.
+              </>
+            )}
+          </p>
+        </div>
+
+        <Link href="/picks" className="btn btn-gold mt-6">
           {view.allIn ? "Review your picks" : "Make your picks"}
         </Link>
-      </>
+      </section>
     );
   }
 
   if (view.kind === "locked") {
     return (
-      <>
+      <section className="billboard rise">
+        <p className="eyebrow">Week {view.week.week_number} · Locked</p>
         <Title>{view.hasEntry ? "Picks are locked" : "This week is locked"}</Title>
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
           {view.hasEntry
             ? `All ${view.totalGames * 2} of them. Nothing to do now but watch.`
             : "You did not have a complete set before the lock, so you are not in this week. A partial entry is never scored."}
         </p>
-        <Link
-          href="/week"
-          className="mt-6 flex min-h-14 w-full items-center justify-center rounded-[var(--radius-target)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-base font-semibold"
-        >
+        <Link href="/week" className="btn btn-ghost mt-6">
           See your picks
         </Link>
-      </>
+      </section>
     );
   }
 
   return (
-    <>
-      <Title>Week {view.week.week_number} final</Title>
+    <section className="billboard rise">
+      <p className="eyebrow">Week {view.week.week_number} · Final</p>
       {view.verdict === "no-entry" ? (
-        <p className="mt-3 text-sm text-[var(--color-text-muted)]">
-          You did not have a complete set, so this week was not scored for you.
-          All {view.possible} picks or nothing.
-        </p>
+        <>
+          <Title>Not scored</Title>
+          <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+            You did not have a complete set, so this week was not scored for
+            you. All {view.possible} picks or nothing.
+          </p>
+        </>
       ) : (
         <>
-          <p className="tabular mt-4 font-[family-name:var(--font-display)] text-5xl font-bold">
-            {view.correct}
-            <span className="text-[var(--color-text-muted)]">/{view.possible}</span>
+          <p className="tabular mt-3 font-[family-name:var(--font-display)] text-7xl font-black uppercase leading-none">
+            {view.verdict === "perfect" ? (
+              <span className="text-gold">{view.correct}</span>
+            ) : (
+              view.correct
+            )}
+            <span className="text-4xl text-[var(--color-text-muted)]">/{view.possible}</span>
           </p>
           <VerdictLine verdict={view.verdict} />
         </>
       )}
-      <Link
-        href="/leaderboard"
-        className="mt-6 flex min-h-14 w-full items-center justify-center rounded-[var(--radius-target)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-base font-semibold"
-      >
+      <Link href="/leaderboard" className="btn btn-ghost mt-6">
         See the board
       </Link>
-    </>
+    </section>
+  );
+}
+
+/**
+ * Each digit sits in its own fixed-width box so the clock does not jitter as
+ * it ticks — the display face has no tabular figures to lean on.
+ */
+function TickingClock({ clock, days }: { clock: string; days: number }) {
+  return (
+    <p
+      className="flex items-baseline font-[family-name:var(--font-display)] text-6xl font-black leading-none"
+      aria-label={`${days > 0 ? `${days} days ` : ""}${clock} until lines lock`}
+    >
+      {days > 0 && (
+        <span className="mr-3">
+          {days}
+          <span className="text-3xl text-[var(--color-text-muted)]">d</span>
+        </span>
+      )}
+      {clock.split("").map((ch, i) =>
+        ch === ":" ? (
+          <span key={i} className="w-[0.3em] text-center text-[var(--color-accent)]">
+            :
+          </span>
+        ) : (
+          <span key={i} className="inline-block w-[0.62em] text-center">
+            {ch}
+          </span>
+        ),
+      )}
+    </p>
   );
 }
 
 function VerdictLine({ verdict }: { verdict: Verdict }) {
   if (verdict === "perfect") {
     return (
-      <p className="mt-2 text-sm font-semibold text-[var(--color-correct)]">
+      <p className="mt-3 text-sm font-semibold text-[var(--color-correct)]">
         Perfect week. Every single one.
       </p>
     );
   }
   if (verdict === "alive") {
     return (
-      <p className="mt-2 text-sm font-semibold text-[var(--color-correct)]">
+      <p className="mt-3 text-sm font-semibold text-[var(--color-correct)]">
         Still alive.
       </p>
     );
   }
   return (
-    <p className="mt-2 text-sm text-[var(--color-text-muted)]">
+    <p className="mt-3 text-sm text-[var(--color-text-muted)]">
       Busted. There is always next week.
     </p>
   );
@@ -198,7 +242,7 @@ function VerdictLine({ verdict }: { verdict: Verdict }) {
 
 function Title({ children }: { children: React.ReactNode }) {
   return (
-    <h1 className="font-[family-name:var(--font-display)] mt-1 text-3xl font-bold uppercase tracking-tight">
+    <h1 className="mt-2 font-[family-name:var(--font-display)] text-4xl font-extrabold uppercase tracking-tight">
       {children}
     </h1>
   );
@@ -207,10 +251,7 @@ function Title({ children }: { children: React.ReactNode }) {
 function Skeleton() {
   return (
     <div aria-hidden>
-      <div className="h-3 w-24 rounded bg-[var(--color-surface)]" />
-      <div className="mt-3 h-9 w-2/3 rounded bg-[var(--color-surface)]" />
-      <div className="mt-4 h-4 w-full rounded bg-[var(--color-surface)]" />
-      <div className="mt-8 h-14 w-full rounded-[var(--radius-target)] bg-[var(--color-surface)]" />
+      <div className="billboard h-64 animate-pulse border-[var(--color-border)]" />
     </div>
   );
 }

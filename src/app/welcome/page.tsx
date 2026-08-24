@@ -108,10 +108,11 @@ export default function Welcome() {
 
   return (
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12">
-      <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold uppercase tracking-tight">
+      <p className="eyebrow rise mb-2">Almost in</p>
+      <h1 className="rise font-[family-name:var(--font-display)] text-4xl font-extrabold uppercase tracking-tight">
         Pick a name
       </h1>
-      <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+      <p className="rise rise-2 mt-3 text-sm text-[var(--color-text-muted)]">
         This is what shows on leaderboards.
       </p>
 
@@ -175,7 +176,7 @@ export default function Welcome() {
         <button
           type="submit"
           disabled={!nameUsable || !agreed || submitting}
-          className="mt-6 min-h-14 w-full rounded-[var(--radius-target)] bg-[var(--color-accent)] px-4 text-base font-semibold text-[#0B0D10] transition-colors duration-[120ms] disabled:opacity-40"
+          className="btn btn-gold mt-6"
         >
           {submitting ? "Setting up…" : "Start picking"}
         </button>
