@@ -1,10 +1,12 @@
 # Running a week by hand
 
-The operator runs three steps from the Supabase SQL editor. Steps 2 and 3 can
-now be handed to `pg_cron` instead — see [Putting steps 2 and 3 on a
-timer](#putting-steps-2-and-3-on-a-timer) — but nothing is scheduled by
-default, and step 1 and entering final scores stay manual until `sync-slate`
-exists.
+The operator runs three steps from the Supabase SQL editor. All three can now be
+automated instead — `sync-slate` opens a week once its lines land, and `pg_cron`
+can run the lock and grade jobs — but **nothing is scheduled by default**, so
+until you switch it on, the steps below are how a week runs.
+
+Entering final scores is the one part still manual everywhere: `sync-slate`
+fetches lines, not results.
 
 Every function below lives in the `private` schema, which PostgREST does not
 expose. There is no REST endpoint for them, so a signed-in user cannot reach
@@ -82,7 +84,11 @@ opens before it:
 The lock time is always shown to the user rather than assumed, so an early lock
 never surprises anyone — but it does mean **Week 1 closes on a Wednesday**.
 
-### Filling in a week's lines
+### Filling in a week's lines by hand
+
+`sync-slate` does this automatically — see [sync-slate: pulling the
+lines](#sync-slate-pulling-the-lines). This is the manual fallback, for a
+correction or when the feed is short.
 
 ```sql
 update public.games g set
@@ -258,6 +264,75 @@ Both columns must move together. The card shows no numbers at all unless
 `stats_season` and `updated_through_week` are both set, which is deliberate:
 an unlabelled record is worse than a sparse card, because the reader supplies
 the wrong season themselves. Phase 2's `sync-slate` takes this step over.
+
+## sync-slate: pulling the lines
+
+`supabase/functions/sync-slate` fetches a week's lines and applies them. It is
+the only one of the three Phase 2 jobs that is an Edge Function, because it is
+the only one that makes an outbound call.
+
+**Where the lines come from, stated plainly.** The provider is nflverse's
+published market data. Those are a **consensus line, not a named sportsbook** —
+nflverse does not attribute them to one, so `line_source` is written as
+`nflverse-consensus` rather than `fanduel`. If the game is ever advertised as
+using FanDuel numbers, the provider has to change first; relabelling alone would
+be grading people against a line they were never shown.
+
+No major book publishes a public odds API. Switching to a named book means an
+aggregator that carries one — SPEC's working assumption is The Odds API with a
+`bookmakers=fanduel` filter — and that is one new `OddsProvider` in
+`supabase/functions/_shared/oddsProvider.ts` plus the constant `sync-slate`
+constructs. Nothing else moves.
+
+### Deploying and running it
+
+```bash
+supabase functions deploy sync-slate
+```
+
+`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are injected by the runtime;
+there is nothing to configure. Run it by hand:
+
+```bash
+# the earliest not-yet-locked week still missing lines
+curl -X POST "https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+
+# or a specific week
+curl -X POST "https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "content-type: application/json" -d '{"weekId": 12}'
+```
+
+It reports `updated`, `missing` and `opened`. `opened: true` means the slate was
+complete and the week is now taking picks. `missing` above zero means it is not,
+and the week stays shut — which is the intended outcome, not a failure.
+
+### Scheduling it
+
+Not scheduled by default, same as the other two. SPEC §5 wants it hourly from
+Tuesday until the slate is complete; hourly year-round is simpler and costs
+nothing, since it returns `nothing-to-do` when no week needs lines.
+
+```sql
+select cron.schedule('sync-slate', '0 * * * *', $$
+  select net.http_post(
+    url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate',
+    headers := '{"Content-Type":"application/json"}'::jsonb
+  );
+$$);
+```
+
+This needs `pg_net` as well as `pg_cron`. Unschedule with
+`select cron.unschedule('sync-slate');`.
+
+### What it will not do
+
+- Touch a locked or scored week. Its numbers are what entries were graded
+  against, and `apply_week_lines` refuses them outright.
+- Open a week with any game missing a line.
+- Write a partial line. A game missing any of spread, total, over odds or under
+  odds is skipped entirely, leaving the column NULL so the week stays shut.
 
 ## Putting steps 2 and 3 on a timer
 

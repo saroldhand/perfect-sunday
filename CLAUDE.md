@@ -56,7 +56,14 @@ and report it rather than using it.
 - **Google OAuth.** Phase 1 is magic link only. The Google button is built but
   flag-disabled; enabling it needs Google Cloud console setup the operator has
   not done. Do not add it back into the signup path.
-- Odds provider integration and the three scheduled Edge Functions (Phase 2).
+- ~~Odds provider integration and the three scheduled Edge Functions (Phase 2).~~
+  **Built 2026-08-24**, at the operator's request. Two of the three are not Edge
+  Functions at all: `lock_week` and `score_week` are pure SQL, so they run on
+  `pg_cron` (migration 0014). Only `sync-slate` calls out, so only it is a
+  function. Lines come from nflverse and are labelled `nflverse-consensus`, not
+  `fanduel` — no major book publishes a public odds API, and mislabelling the
+  source would be grading people against a line they were never shown. Nothing
+  is scheduled by default; see `supabase/OPERATIONS.md`.
 - Groups, season standings view, live My Week screen (Phase 3).
 - Custom domain. `SHARE_DOMAIN` stays the github.io URL until one is bought.
 
