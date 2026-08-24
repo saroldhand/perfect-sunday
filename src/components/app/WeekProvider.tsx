@@ -65,17 +65,38 @@ export function useWeek() {
  */
 export function WeekProvider({ children }: { children: React.ReactNode }) {
   const session = useSession();
+  const userId = session.status === "signed-in" ? session.session.user.id : null;
   const [value, setValue] = useState<WeekContextValue>(EMPTY);
   const [nonce, setNonce] = useState(0);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
+
+  // Reset when the identity changes — signing out, or a different account
+  // signing in — so the previous user's data cannot render underneath the
+  // new session while the refetch is in flight. A plain refresh() keeps the
+  // current data on screen instead of blanking it.
+  //
+  // This runs during render (React's documented "adjusting state when a prop
+  // changes" pattern) rather than as a setState call at the top of the effect
+  // below: this repo's lint config (react-hooks/set-state-in-effect) flags
+  // the latter, and for good reason here — an effect runs after paint, so a
+  // synchronous setValue there can let one stale frame reach the screen
+  // before the reset lands. Doing it in render avoids that frame entirely.
+  const [lastUserId, setLastUserId] = useState(userId);
+  if (session.status !== "checking" && lastUserId !== userId) {
+    setLastUserId(userId);
+    setValue((prev) =>
+      prev.userId === userId && prev.phase === "ready"
+        ? prev
+        : { ...EMPTY, phase: "loading", signedIn: userId !== null, userId, refresh },
+    );
+  }
 
   useEffect(() => {
     // Signed-out is a normal state here, not an error: the board is public.
     // Only "checking" means wait.
     if (session.status === "checking") return;
 
-    const userId = session.status === "signed-in" ? session.session.user.id : null;
     let active = true;
 
     (async () => {
@@ -125,6 +146,10 @@ export function WeekProvider({ children }: { children: React.ReactNode }) {
         ...EMPTY,
         phase: "error",
         error: err instanceof Error ? err.message : String(err),
+        // A failed fetch says nothing about who is signed in. Spreading EMPTY
+        // alone would erase that and show the sign-in form to a signed-in user.
+        signedIn: userId !== null,
+        userId,
         refresh,
       });
     });
@@ -132,7 +157,7 @@ export function WeekProvider({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [session, nonce, refresh]);
+  }, [session, nonce, refresh, userId]);
 
   return <WeekContext.Provider value={value}>{children}</WeekContext.Provider>;
 }
