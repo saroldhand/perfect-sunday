@@ -37,21 +37,31 @@ export default function Leaderboard() {
 
   return (
     <>
-      <Title>{boardWeek ? `Week ${boardWeek.week_number}` : "Leaderboard"}</Title>
+      <Title>
+        {boardWeek
+          ? `Week ${boardWeek.week_number}${showsCurrent ? "" : " final"}`
+          : "Leaderboard"}
+      </Title>
 
       {!showsCurrent && week && (week.status === "open" || week.status === "upcoming") && (
         <p className="mt-2 text-sm text-[var(--color-text-muted)]">
-          Standings open when picks lock —{" "}
-          <span className="tabular text-[var(--color-accent)]">
-            {countdownTo(week.locks_at, now).label}
-          </span>
-          . Entries are created at lock, and only for a complete set.
-        </p>
-      )}
-
-      {!showsCurrent && boardWeek && (
-        <p className="mt-2 text-xs uppercase tracking-widest text-[var(--color-text-muted)]">
-          Last week&rsquo;s final standings
+          {boardWeek ? (
+            <>
+              Final standings. This week&rsquo;s board opens when picks lock —{" "}
+              <span className="tabular text-[var(--color-accent)]">
+                {countdownTo(week.locks_at, now).label}
+              </span>
+              .
+            </>
+          ) : (
+            <>
+              Standings open when picks lock —{" "}
+              <span className="tabular text-[var(--color-accent)]">
+                {countdownTo(week.locks_at, now).label}
+              </span>
+              . Entries are created at lock, and only for a complete set.
+            </>
+          )}
         </p>
       )}
 
