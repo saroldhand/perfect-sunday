@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useWeek } from "@/components/app/WeekProvider";
 import { PickSummaryRow } from "@/components/week/PickSummaryRow";
+import { isGameComplete } from "@/lib/picks";
 import { formatLockTime } from "@/lib/format";
 
 export default function MyWeek() {
@@ -35,19 +36,24 @@ export default function MyWeek() {
     );
   }
 
-  if (!week || games.length === 0) {
+  // `upcoming` is its own state, matching the deck and the hub: a week can have
+  // its games seeded before every line is posted, and showing a list of
+  // "Not picked" rows against numbers that do not exist yet is a lie.
+  if (!week || week.status === "upcoming" || games.length === 0) {
     return (
       <>
         <Title>Your week</Title>
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
-          No slate is posted yet, so there is nothing to show.
+          {week
+            ? "Every game needs a posted line before picks open. Nothing to show until then."
+            : "No slate is posted yet, so there is nothing to show."}
         </p>
       </>
     );
   }
 
   const graded = week.status === "scored";
-  const picked = games.filter((g) => results[g.id]?.total && results[g.id]?.spread).length;
+  const picked = games.filter((g) => isGameComplete(results[g.id])).length;
 
   return (
     <>
