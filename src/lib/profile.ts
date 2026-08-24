@@ -24,10 +24,10 @@ export async function getProfile(userId: string): Promise<Profile | null> {
  * finished signing up; a user whose accepted rules are out of date needs to
  * see the gate again rather than having the new version applied silently.
  */
-export function landingRoute(profile: Profile | null): "/welcome" | "/picks" {
+export function landingRoute(profile: Profile | null): "/welcome" | "/" {
   if (!profile) return "/welcome";
   if (profile.terms_version !== TERMS_VERSION) return "/welcome";
-  return "/picks";
+  return "/";
 }
 
 export function isDisplayNameAvailable(name: string) {

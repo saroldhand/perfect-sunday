@@ -36,7 +36,7 @@ export default function AuthCallback() {
 
   // Where the magic link lands. detectSessionInUrl performs the PKCE exchange
   // as the client initialises, so this page waits for that and then routes — to
-  // the display-name gate for a new user, to the picks for a returning one.
+  // the display-name gate for a new user, to the hub for a returning one.
   useEffect(() => {
     if (linkError || session.status !== "signed-in") return;
     let active = true;
