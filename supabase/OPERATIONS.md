@@ -58,14 +58,93 @@ id rather than resetting it. A statement filtered on a guessed id does not
 error; it matches nothing and reports success, which is the worst way for an
 operator step to fail. Substitute the season and week number, not an id.
 
+## The season is preloaded; the lines are not
+
+Migration 0015 seeds the whole 2026 regular season — 18 weeks, 272 games — with
+matchups, kickoff times and computed lock times, and with `spread`, `total`,
+`over_odds`, `under_odds` and `line_source` all NULL. Schedules are published
+months ahead; lines are not. Loading what is known early leaves only the numbers
+to fill in weekly.
+
+Every week is seeded `upcoming`. **A week must not be opened until every game on
+its slate has a complete line** — that is SPEC §5's rule, and it is what stops
+anyone picking against a number that is not really there.
+
+Three weeks lock earlier than the usual Thursday 4:00 PM ET, because their slate
+opens before it:
+
+| Week | Opens | Locks |
+|---|---|---|
+| 1 | Wed 9 Sep, 8:20 PM ET — season opener | Wed 9 Sep, 7:50 PM ET |
+| 12 | Wed 25 Nov, 8:00 PM ET — Thanksgiving week | Wed 25 Nov, 7:30 PM ET |
+| 18 | Sun 10 Jan, 1:00 PM ET — no Thursday game | Sun 10 Jan, 12:30 PM ET |
+
+The lock time is always shown to the user rather than assumed, so an early lock
+never surprises anyone — but it does mean **Week 1 closes on a Wednesday**.
+
+### Filling in a week's lines
+
+```sql
+update public.games g set
+  spread = v.spread, total = v.total,
+  over_odds = v.over_odds, under_odds = v.under_odds,
+  line_source = 'fanduel'
+from (values
+  ('2026-01-NE-SEA',  -3.5, 44.5, -110, -110),
+  ('2026-01-DAL-PHI',  2.5, 47.5, -105, -115)
+  -- ...one row per game on the slate
+) as v (external_id, spread, total, over_odds, under_odds)
+where g.external_id = v.external_id;
+```
+
+`external_id` is `{season}-{week}-{away}-{home}`, e.g. `2026-01-NE-SEA`, and is
+unique across the season, so this needs no week filter.
+
+Set `line_source` to the book the numbers actually came from. If they did not
+come from FanDuel, say so — grading an entry against a line the user never saw
+is the worst failure this product has, and a wrong provenance label is how that
+happens quietly.
+
+### Check the slate is complete before opening
+
+```sql
+select w.week_number,
+       count(*) as games,
+       count(*) filter (where g.spread is null or g.total is null) as missing
+from public.games g
+join public.weeks w on w.id = g.week_id
+where w.season = 2026
+group by w.week_number
+order by w.week_number;
+```
+
+Open the week only when `missing` is 0. Step 1 below is that step.
+
+### Cutting over from the demo week
+
+The 2025 Week 18 demo week is still in the database and still `open`, and an
+open week wins over every upcoming one — so until it is closed, the app shows
+the demo rather than the real season. Before Week 1:
+
+```sql
+update public.weeks set status = 'scored'
+where season = 2025 and week_number = 18;
+```
+
+`scored` rather than deleted keeps the demo picks and entries as history and
+keeps the leaderboard's "last scored week" fallback with something to show. To
+remove it outright instead, `delete from public.weeks where season = 2025 and
+week_number = 18;` cascades to its games, picks and entries.
+
 ## 1. Open the week
 
 Picks are writable only while `weeks.status = 'open'` — that is enforced by RLS,
 not by the UI.
 
 ```sql
+-- Only once the slate check above reports missing = 0.
 update public.weeks set status = 'open'
-where season = 2025 and week_number = 18;
+where season = 2026 and week_number = 1;
 ```
 
 ## 2. Lock it
@@ -77,7 +156,7 @@ leaderboard — their pick rows stay for their own history.
 
 ```sql
 select private.lock_week(
-  (select id from public.weeks where season = 2025 and week_number = 18)
+  (select id from public.weeks where season = 2026 and week_number = 1)
 );
 ```
 
@@ -93,22 +172,22 @@ One call per finished game, then one call to grade. `set_final_score` takes the
 from a box score.
 
 ```sql
--- Week 18 demo slate: external_ids are '2025-18-AWAY-HOME'.
+-- external_ids are '{season}-{week}-AWAY-HOME', e.g. '2026-01-NE-SEA'.
 -- One row per finished game. The numbers below are placeholders — replace them
 -- with the real box score.
 with wk as (
-  select id from public.weeks where season = 2025 and week_number = 18
+  select id from public.weeks where season = 2026 and week_number = 1
 )
 select private.set_final_score(wk.id, v.external_id, v.home_score, v.away_score)
 from wk
 cross join (values
-  ('2025-18-CAR-TB', 17, 24),
-  ('2025-18-SEA-SF', 20, 13)
+  ('2026-01-NE-SEA',  17, 24),
+  ('2026-01-DAL-PHI', 20, 13)
   -- ...
 ) as v (external_id, home_score, away_score);
 
 select * from private.score_week(
-  (select id from public.weeks where season = 2025 and week_number = 18)
+  (select id from public.weeks where season = 2026 and week_number = 1)
 );
 ```
 
@@ -144,7 +223,7 @@ select p.display_name, e.correct_count, e.picks_possible
 from public.entries e
 join public.profiles p on p.id = e.user_id
 join public.weeks w on w.id = e.week_id
-where w.season = 2025 and w.week_number = 18 and e.is_perfect;
+where w.season = 2026 and w.week_number = 1 and e.is_perfect;
 ```
 
 If this ever returns a row, handle the prize manually. Multiple winners split
@@ -250,6 +329,9 @@ grades whatever `set_final_score` has marked final, and nothing yet marks games
 final on its own.
 
 ## Resetting the demo
+
+Aimed at the 2025 Week 18 demo week specifically — substitute the season and
+week number to rewind a real one.
 
 To replay the demo week from scratch:
 
