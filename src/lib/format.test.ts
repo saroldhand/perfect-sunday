@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockTo, statsProvenance } from "./format";
+import { clockTo, ordinal, statsProvenance } from "./format";
 
 const T0 = Date.parse("2026-09-10T20:00:00Z");
 const at = (ms: number) => new Date(T0 + ms).toISOString();
@@ -51,5 +51,22 @@ describe("statsProvenance", () => {
     // record — it must suppress the line entirely.
     expect(statsProvenance({ stats_season: null, updated_through_week: 18 })).toBeNull();
     expect(statsProvenance({ stats_season: 2025, updated_through_week: null })).toBeNull();
+  });
+});
+
+describe("ordinal", () => {
+  it("suffixes the ordinary cases", () => {
+    expect([1, 2, 3, 4, 9].map(ordinal)).toEqual(["1st", "2nd", "3rd", "4th", "9th"]);
+  });
+
+  it("gives the teens th, which is the case naive versions get wrong", () => {
+    expect([11, 12, 13].map(ordinal)).toEqual(["11th", "12th", "13th"]);
+    expect([21, 22, 23, 111, 112].map(ordinal)).toEqual([
+      "21st",
+      "22nd",
+      "23rd",
+      "111th",
+      "112th",
+    ]);
   });
 });

@@ -124,3 +124,22 @@ export function statsProvenance(team: {
 
 /** An NFL regular season is eighteen weeks, so "through 18" means final. */
 const REGULAR_SEASON_WEEKS = 18;
+
+/**
+ * 1st, 2nd, 3rd, 4th — including the teens, which is the part naive
+ * implementations get wrong: 11th, 12th and 13th, never 11st, 12nd, 13rd.
+ */
+export function ordinal(n: number): string {
+  const teens = Math.abs(n) % 100;
+  if (teens >= 11 && teens <= 13) return `${n}th`;
+  switch (Math.abs(n) % 10) {
+    case 1:
+      return `${n}st`;
+    case 2:
+      return `${n}nd`;
+    case 3:
+      return `${n}rd`;
+    default:
+      return `${n}th`;
+  }
+}

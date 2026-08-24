@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWeek } from "@/components/app/WeekProvider";
+import { ShareButton } from "@/components/app/ShareButton";
 import { SignInForm } from "@/components/auth/SignInForm";
 import { landingRoute } from "@/lib/profile";
 import { hubView, type HubView, type Verdict } from "@/lib/hub";
 import { isGameComplete } from "@/lib/picks";
-import { clockTo, formatLockTime } from "@/lib/format";
+import { rankEntries } from "@/lib/leaderboard";
+import { buildPicksShare } from "@/lib/share";
+import { clockTo, formatLockTime, ordinal } from "@/lib/format";
 
 export default function Hub() {
   const { phase, error, signedIn, profile, week, games, results, boardWeek, boardEntries, userId } =
@@ -54,11 +57,41 @@ export default function Hub() {
       ? boardEntries.find((e) => e.user_id === userId) ?? null
       : null;
 
-  const view = hubView({ week, totalGames: games.length, completed, entry: myEntry });
+  // Computed rather than taken from games[0]: the query happens to order by
+  // kickoff, but the countdown should not silently move if that ordering ever
+  // changes.
+  const firstKickoff =
+    games.length === 0
+      ? null
+      : games.reduce(
+          (earliest, g) =>
+            Date.parse(g.kickoff_at) < Date.parse(earliest) ? g.kickoff_at : earliest,
+          games[0].kickoff_at,
+        );
+
+  const myRank =
+    rankEntries(boardEntries).find((row) => row.user_id === userId)?.rank ?? null;
+
+  const view = hubView({
+    week,
+    totalGames: games.length,
+    completed,
+    entry: myEntry,
+    firstKickoff,
+    rank: myRank,
+    fieldSize: boardEntries.length,
+  });
+
+  const shareTextFor = () =>
+    buildPicksShare(
+      week?.week_number ?? 0,
+      games.map((g) => results[g.id]?.total ?? null),
+      games.map((g) => results[g.id]?.spread ?? null),
+    );
 
   return (
     <>
-      <Body view={view} now={now} />
+      <Body view={view} now={now} share={shareTextFor} />
       <Link
         href="/rules"
         className="mt-10 block text-xs text-[var(--color-text-muted)] underline underline-offset-4"
@@ -69,7 +102,15 @@ export default function Hub() {
   );
 }
 
-function Body({ view, now }: { view: HubView; now: number }) {
+function Body({
+  view,
+  now,
+  share,
+}: {
+  view: HubView;
+  now: number;
+  share: () => string;
+}) {
   if (view.kind === "no-week") {
     return (
       <section className="billboard rise">
@@ -105,7 +146,7 @@ function Body({ view, now }: { view: HubView; now: number }) {
       <section className="billboard rise">
         <p className="eyebrow">Week {view.week.week_number} · Picks open</p>
         <div className="mt-4">
-          <TickingClock clock={clock.clock} days={clock.days} />
+          <TickingClock clock={clock.clock} days={clock.days} label="until lines lock" />
           <p className="mt-1 text-xs uppercase tracking-widest text-[var(--color-text-muted)]">
             Until lines lock · {formatLockTime(view.week.locks_at)}
           </p>
@@ -132,24 +173,65 @@ function Body({ view, now }: { view: HubView; now: number }) {
           </p>
         </div>
 
-        <Link href="/picks" className="btn btn-gold mt-6">
-          {view.allIn ? "Review your picks" : "Make your picks"}
-        </Link>
+        {view.allIn ? (
+          // Once the set is complete, sharing is the next thing worth doing —
+          // so it takes the primary button and changing picks steps back.
+          <>
+            <ShareButton build={share} label="Share your picks" />
+            <Link href="/picks" className="btn btn-ghost mt-3">
+              Change your picks
+            </Link>
+          </>
+        ) : (
+          <Link href="/picks" className="btn btn-gold mt-6">
+            Make your picks
+          </Link>
+        )}
       </section>
     );
   }
 
   if (view.kind === "locked") {
+    // The stretch between Thursday lock and Sunday kickoff is the longest the
+    // app ever asks anyone to wait. A clock is the only thing this screen can
+    // honestly offer in it.
+    const kickoff = view.firstKickoff ? clockTo(view.firstKickoff, now) : null;
     return (
       <section className="billboard rise">
         <p className="eyebrow">Week {view.week.week_number} · Locked</p>
-        <Title>{view.hasEntry ? "Picks are locked" : "This week is locked"}</Title>
+
+        {kickoff && !kickoff.expired ? (
+          <div className="mt-4">
+            <TickingClock
+              clock={kickoff.clock}
+              days={kickoff.days}
+              label="until first kickoff"
+            />
+            <p className="mt-1 text-xs uppercase tracking-widest text-[var(--color-text-muted)]">
+              Until first kickoff
+            </p>
+          </div>
+        ) : (
+          <Title>
+            {kickoff
+              ? "Under way"
+              : view.hasEntry
+                ? "Picks are locked"
+                : "This week is locked"}
+          </Title>
+        )}
+
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
           {view.hasEntry
-            ? `All ${view.totalGames * 2} of them. Nothing to do now but watch.`
+            ? `Your ${view.totalGames * 2} picks are in. Nothing to do now but watch.`
             : "You did not have a complete set before the lock, so you are not in this week. A partial entry is never scored."}
         </p>
-        <Link href="/week" className="btn btn-ghost mt-6">
+
+        {view.hasEntry && <ShareButton build={share} label="Share your picks" />}
+        <Link
+          href="/week"
+          className={`btn btn-ghost ${view.hasEntry ? "mt-3" : "mt-6"}`}
+        >
           See your picks
         </Link>
       </section>
@@ -180,6 +262,11 @@ function Body({ view, now }: { view: HubView; now: number }) {
           <VerdictLine verdict={view.verdict} />
         </>
       )}
+      {view.rank !== null && (
+        <p className="tabular mt-3 text-sm text-[var(--color-text-muted)]">
+          {ordinal(view.rank)} of {view.fieldSize} on the board
+        </p>
+      )}
       <Link href="/leaderboard" className="btn btn-ghost mt-6">
         See the board
       </Link>
@@ -191,11 +278,21 @@ function Body({ view, now }: { view: HubView; now: number }) {
  * Each digit sits in its own fixed-width box so the clock does not jitter as
  * it ticks — the display face has no tabular figures to lean on.
  */
-function TickingClock({ clock, days }: { clock: string; days: number }) {
+function TickingClock({
+  clock,
+  days,
+  label,
+}: {
+  clock: string;
+  days: number;
+  /** What the clock counts down to, for the screen reader. Passed in because
+   *  this now serves both the lock and the first kickoff. */
+  label: string;
+}) {
   return (
     <p
       className="flex items-baseline font-[family-name:var(--font-display)] text-6xl font-black leading-none"
-      aria-label={`${days > 0 ? `${days} days ` : ""}${clock} until lines lock`}
+      aria-label={`${days > 0 ? `${days} days ` : ""}${clock} ${label}`}
     >
       {days > 0 && (
         <span className="mr-3">

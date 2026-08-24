@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { PickSummaryRow } from "@/components/week/PickSummaryRow";
+import { ShareButton } from "@/components/app/ShareButton";
 import { isGameComplete, type PickMap } from "@/lib/picks";
-import { buildPicksShare, shareText } from "@/lib/share";
+import { buildPicksShare } from "@/lib/share";
 import type { Game } from "@/lib/week";
 
 type Props = {
@@ -25,22 +25,15 @@ export function ReviewScreen({
   locking,
   locked,
 }: Props) {
-  const [toast, setToast] = useState<string | null>(null);
-
   const missing = games.filter((g) => !isGameComplete(picks[g.id]));
   const allIn = missing.length === 0;
 
-  async function share() {
-    const text = buildPicksShare(
+  const shareTextFor = () =>
+    buildPicksShare(
       weekNumber,
       games.map((g) => picks[g.id]?.total ?? null),
       games.map((g) => picks[g.id]?.spread ?? null),
     );
-    const outcome = await shareText(text);
-    if (outcome === "shared") return; // the native sheet is its own feedback
-    setToast(outcome === "copied" ? "Copied" : "Could not share");
-    setTimeout(() => setToast(null), 2000);
-  }
 
   if (locked) {
     return (
@@ -51,14 +44,7 @@ export function ReviewScreen({
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
           All {games.length * 2} of them. Nothing to do now but wait.
         </p>
-        <button type="button" onClick={share} className="btn btn-gold mt-6">
-          Share your picks
-        </button>
-        {toast && (
-          <p className="mt-3 text-center text-sm text-[var(--color-text-muted)]">
-            {toast}
-          </p>
-        )}
+        <ShareButton build={shareTextFor} label="Share your picks" />
       </div>
     );
   }
