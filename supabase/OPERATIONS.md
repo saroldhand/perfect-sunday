@@ -1,11 +1,14 @@
 # Running a week by hand
 
-Phase 1 has no scheduled jobs. The operator runs three steps from the Supabase
-SQL editor. Phase 2's Edge Functions will call the same three functions on a
-timer — the logic does not change, only what triggers it.
+The operator runs three steps from the Supabase SQL editor. Steps 2 and 3 can
+now be handed to `pg_cron` instead — see [Putting steps 2 and 3 on a
+timer](#putting-steps-2-and-3-on-a-timer) — but nothing is scheduled by
+default, and step 1 and entering final scores stay manual until `sync-slate`
+exists.
 
-All three live in the `private` schema, which PostgREST does not expose. There
-is no REST endpoint for them, so a signed-in user cannot reach them.
+Every function below lives in the `private` schema, which PostgREST does not
+expose. There is no REST endpoint for them, so a signed-in user cannot reach
+them.
 
 ## Migrations are applied by hand, and the frontend is not
 
@@ -176,6 +179,75 @@ Both columns must move together. The card shows no numbers at all unless
 `stats_season` and `updated_through_week` are both set, which is deliberate:
 an unlabelled record is worse than a sparse card, because the reader supplies
 the wrong season themselves. Phase 2's `sync-slate` takes this step over.
+
+## Putting steps 2 and 3 on a timer
+
+Migration 0014 adds two wrappers that pick their own weeks, so they can be run
+by a scheduler with no argument:
+
+- `private.lock_due_weeks()` — locks every `open` week whose `locks_at` has
+  passed. Selecting on the clock rather than trusting the job to fire at
+  exactly 4:00 means a missed or delayed tick still locks the week on the next
+  one, late but correct.
+- `private.score_due_weeks()` — grades every `locked` week. A week leaves this
+  job the moment `score_week` flips it to `scored`, so a published result is
+  never rewritten by a later tick.
+
+Both are idempotent, and `supabase/tests/jobs.sql` asserts it — including the
+two mistakes that only show up after a week on a timer: locking a week that was
+not due, and re-writing one already scored.
+
+### Why these are not Edge Functions
+
+SPEC §5 files all three Phase 2 jobs as Edge Functions. That is right for
+`sync-slate`, which calls an odds aggregator over HTTPS. It is wrong for these
+two: they are pure SQL over tables in this database and call nothing outside
+it. An Edge Function would add an HTTP hop, a service-role key sitting in a
+function secret, and a deploy step, all to reach a function already living in
+the database `pg_cron` runs in.
+
+Only `sync-slate` needs to be an Edge Function, and it is not built yet — it
+waits on the aggregator decision in SPEC's open decisions.
+
+### Switching it on
+
+**Nothing is scheduled by default.** 0014 creates the functions and stops
+there, because turning automation on changes what the database does while
+nobody is watching, and the demo week is still driven by hand.
+
+When you do want it, in the Supabase SQL editor:
+
+```sql
+create extension if not exists pg_cron;
+
+-- Every ten minutes. lock_due_weeks is cheap when nothing is due — one indexed
+-- scan of a table with one row per week — so a frequent tick costs nothing and
+-- bounds how late a lock can be.
+select cron.schedule('lock-due-weeks', '*/10 * * * *',
+  $$select private.lock_due_weeks()$$);
+
+-- SPEC §5 asks for every ten minutes from first kickoff through Monday night.
+-- Running it year-round is simpler and just as cheap: with no locked week it
+-- returns zero rows.
+select cron.schedule('score-due-weeks', '*/10 * * * *',
+  $$select private.score_due_weeks()$$);
+```
+
+`cron.schedule` runs in UTC. Neither job needs a wall-clock time, which is the
+point of selecting by status and `locks_at` — there is no Eastern offset to get
+wrong here, and no DST shift to track.
+
+To check and to switch off:
+
+```sql
+select jobname, schedule, active from cron.job;
+select cron.unschedule('lock-due-weeks');
+select cron.unschedule('score-due-weeks');
+```
+
+Entering final scores stays manual until `sync-slate` exists: `score_due_weeks`
+grades whatever `set_final_score` has marked final, and nothing yet marks games
+final on its own.
 
 ## Resetting the demo
 

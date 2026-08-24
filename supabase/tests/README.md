@@ -1,6 +1,6 @@
 # Database tests
 
-Two suites. `rls.sql` asserts the deny case for every policy that guards user data. It is
+Three suites. `rls.sql` asserts the deny case for every policy that guards user data. It is
 the difference between "RLS is enabled" and "RLS works".
 
 Run it against the project database. Statements marked **Expect ERROR 42501**
@@ -61,3 +61,27 @@ Results as of 2026-08-21, all 11 passing:
 
 The idempotency cases matter because the Phase 2 job will re-run over
 already-final games every ten minutes.
+
+## `jobs.sql` — schedulable wrappers
+
+Covers the week *selection* the 0014 wrappers add over `lock_week` and
+`score_week`; the grading rules themselves are `scoring.sql`'s job. Runs in a
+transaction ending in ROLLBACK on fixture weeks 990 and 991.
+
+Results as of 2026-08-24, all 9 passing:
+
+| Test | Asserts | Result |
+|---|---|---|
+| 1 | `lock_due_weeks` locks a week past its `locks_at` | PASS |
+| 2 | `lock_due_weeks` leaves a week whose lock time has not arrived | PASS |
+| 3 | Locking creates the entry for a complete set | PASS |
+| 4 | A second run in the same minute finds nothing due | PASS |
+| 5 | That second run does not duplicate the entry | PASS |
+| 6 | A locked week with no final games stays locked | PASS |
+| 7 | `score_due_weeks` grades and flips the week to `scored` | PASS |
+| 8 | The entry is graded correctly through the wrapper | PASS |
+| 9 | A scored week drops out of the job and is never rewritten | PASS |
+
+Tests 2 and 9 are the ones worth having. Both failures — locking a week early,
+and rewriting a result that has already been published — are invisible in a
+single run and only surface after the job has been on a timer for a week.
