@@ -10,6 +10,8 @@ export type Week = {
   status: WeekStatus;
 };
 
+export type GameStatus = "scheduled" | "in_progress" | "final";
+
 export type Game = {
   id: string;
   home_team: string;
@@ -19,6 +21,9 @@ export type Game = {
   total: number | null;
   over_odds: number | null;
   under_odds: number | null;
+  home_score: number | null;
+  away_score: number | null;
+  status: GameStatus;
 };
 
 export type Team = {
@@ -69,7 +74,9 @@ export async function getCurrentWeek(): Promise<Week | null> {
 export async function getGames(weekId: number): Promise<Game[]> {
   const { data, error } = await supabase
     .from("games")
-    .select("id, home_team, away_team, kickoff_at, spread, total, over_odds, under_odds")
+    .select(
+      "id, home_team, away_team, kickoff_at, spread, total, over_odds, under_odds, home_score, away_score, status",
+    )
     .eq("week_id", weekId)
     .order("kickoff_at", { ascending: true })
     .order("id", { ascending: true });
@@ -85,4 +92,23 @@ export async function getTeams(): Promise<Record<string, Team>> {
 
   if (error) throw new Error(error.message);
   return Object.fromEntries(((data ?? []) as Team[]).map((t) => [t.abbr, t]));
+}
+
+/**
+ * The most recent finished week. The board shows this before the current
+ * week locks, because entries do not exist until lock_week runs and there is
+ * nothing to rank until then.
+ */
+export async function getLastScoredWeek(): Promise<Week | null> {
+  const { data, error } = await supabase
+    .from("weeks")
+    .select("id, season, week_number, locks_at, status")
+    .eq("status", "scored")
+    .order("season", { ascending: false })
+    .order("week_number", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return (data as Week) ?? null;
 }
