@@ -39,7 +39,7 @@ export default function Leaderboard() {
     <>
       <Title>
         {boardWeek
-          ? `Week ${boardWeek.week_number}${showsCurrent ? "" : " final"}`
+          ? `Week ${boardWeek.week_number}${boardWeek.status === "scored" ? " final" : ""}`
           : "Leaderboard"}
       </Title>
 
@@ -67,7 +67,7 @@ export default function Leaderboard() {
 
       {ranked.length === 0 ? (
         <p className="mt-6 text-sm text-[var(--color-text-muted)]">
-          {week
+          {week && (week.status === "open" || week.status === "upcoming")
             ? `Nobody is on the board yet. Locks ${formatLockTime(week.locks_at)}.`
             : "No week has been played yet."}
         </p>

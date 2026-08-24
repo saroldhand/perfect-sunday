@@ -122,9 +122,8 @@ export function SignInForm() {
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col justify-center px-6 py-12">
-      {children}
-    </main>
-  );
+  // The route-group layout owns the page frame — width, horizontal padding, and
+  // the space under the tab bar. This only needs to sit roughly centred inside
+  // it, so it must not restate min-h-dvh or the max width.
+  return <div className="flex min-h-[70dvh] flex-col justify-center">{children}</div>;
 }

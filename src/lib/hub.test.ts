@@ -74,7 +74,12 @@ describe("hubView", () => {
 
   it("reports a locked week without a score", () => {
     const view = hubView({ week: week("locked"), totalGames: 16, completed: 16, entry: entry() });
-    expect(view).toMatchObject({ kind: "locked", totalGames: 16 });
+    expect(view).toMatchObject({ kind: "locked", totalGames: 16, hasEntry: true });
+  });
+
+  it("knows a locked week has no entry for an incomplete picker", () => {
+    const view = hubView({ week: week("locked"), totalGames: 16, completed: 9, entry: null });
+    expect(view).toMatchObject({ kind: "locked", hasEntry: false });
   });
 
   it("reports the record and verdict once scored", () => {

@@ -27,7 +27,7 @@ export type HubView =
   | { kind: "no-week" }
   | { kind: "upcoming"; week: Week }
   | { kind: "open"; week: Week; completed: number; totalGames: number; allIn: boolean }
-  | { kind: "locked"; week: Week; totalGames: number }
+  | { kind: "locked"; week: Week; totalGames: number; hasEntry: boolean }
   | { kind: "scored"; week: Week; correct: number; possible: number; verdict: Verdict };
 
 /**
@@ -59,7 +59,9 @@ export function hubView(input: HubInput): HubView {
   }
 
   if (week.status === "locked") {
-    return { kind: "locked", week, totalGames };
+    // An entry exists only for a complete set, so its absence is how we know
+    // this user is not in this week at all.
+    return { kind: "locked", week, totalGames, hasEntry: entry !== null };
   }
 
   return {

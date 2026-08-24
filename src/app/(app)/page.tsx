@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useWeek } from "@/components/app/WeekProvider";
 import { SignInForm } from "@/components/auth/SignInForm";
+import { landingRoute } from "@/lib/profile";
 import { hubView, type HubView, type Verdict } from "@/lib/hub";
 import { isGameComplete } from "@/lib/picks";
 import { countdownTo, formatLockTime } from "@/lib/format";
@@ -20,9 +21,13 @@ export default function Hub() {
     return () => clearInterval(id);
   }, []);
 
-  // A signed-in user with no profile has not finished signing up.
+  // A signed-in user with no profile has not finished signing up; one whose
+  // accepted rules are out of date needs the gate again rather than having the
+  // new version applied silently. landingRoute owns both rules.
   useEffect(() => {
-    if (phase === "ready" && signedIn && !profile) router.replace("/welcome");
+    if (phase === "ready" && signedIn && landingRoute(profile) !== "/") {
+      router.replace("/welcome");
+    }
   }, [phase, signedIn, profile, router]);
 
   if (phase === "loading") return <Skeleton />;
@@ -35,7 +40,10 @@ export default function Hub() {
     );
   }
   if (!signedIn) return <SignInForm />;
-  if (!profile) return <Skeleton />;
+  // The `!profile ||` is redundant at runtime — landingRoute(null) is always
+  // "/welcome" — but it is what lets TypeScript narrow profile below, since it
+  // cannot see through the landingRoute call on its own.
+  if (!profile || landingRoute(profile) !== "/") return <Skeleton />;
 
   const completed = games.filter((g) => isGameComplete(results[g.id])).length;
   // The board only carries the current week's entries once it is locked.
@@ -123,9 +131,11 @@ function Body({ view, now }: { view: HubView; now: number }) {
   if (view.kind === "locked") {
     return (
       <>
-        <Title>Picks are locked</Title>
+        <Title>{view.hasEntry ? "Picks are locked" : "This week is locked"}</Title>
         <p className="mt-3 text-sm text-[var(--color-text-muted)]">
-          All {view.totalGames * 2} of them. Nothing to do now but watch.
+          {view.hasEntry
+            ? `All ${view.totalGames * 2} of them. Nothing to do now but watch.`
+            : "You did not have a complete set before the lock, so you are not in this week. A partial entry is never scored."}
         </p>
         <Link
           href="/week"
