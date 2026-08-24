@@ -10,7 +10,7 @@ import { landingRoute } from "@/lib/profile";
 import { hubView, type HubView, type Verdict } from "@/lib/hub";
 import { isGameComplete } from "@/lib/picks";
 import { rankEntries } from "@/lib/leaderboard";
-import { buildPicksShare } from "@/lib/share";
+import { buildPicksShare, buildResultsShare, resultClause } from "@/lib/share";
 import { clockTo, formatLockTime, ordinal } from "@/lib/format";
 
 export default function Hub() {
@@ -89,9 +89,37 @@ export default function Hub() {
       games.map((g) => results[g.id]?.spread ?? null),
     );
 
+  // Once the week is scored the grid is what people send, not the picks. Both
+  // read the same games in the same kickoff order.
+  const shareResultsFor = () => {
+    const totals = games.map((g) => results[g.id]?.totalCorrect ?? null);
+    const spreads = games.map((g) => results[g.id]?.spreadCorrect ?? null);
+    return buildResultsShare({
+      weekNumber: week?.week_number ?? 0,
+      totals,
+      spreads,
+      // The entry's own count is authoritative — it is what the board ranks on
+      // — so the share agrees with the standings rather than recounting.
+      correct:
+        myEntry?.correct_count ??
+        [...totals, ...spreads].filter((g) => g === true).length,
+      possible: myEntry?.picks_possible ?? games.length * 2,
+      clause: resultClause({
+        kickoffs: games.map((g) => g.kickoff_at),
+        totals,
+        spreads,
+      }),
+    });
+  };
+
   return (
     <>
-      <Body view={view} now={now} share={shareTextFor} />
+      <Body
+        view={view}
+        now={now}
+        share={shareTextFor}
+        shareResults={shareResultsFor}
+      />
       <Link
         href="/rules"
         className="mt-10 block text-xs text-[var(--color-text-muted)] underline underline-offset-4"
@@ -106,10 +134,12 @@ function Body({
   view,
   now,
   share,
+  shareResults,
 }: {
   view: HubView;
   now: number;
   share: () => string;
+  shareResults: () => string;
 }) {
   if (view.kind === "no-week") {
     return (
@@ -267,7 +297,16 @@ function Body({
           {ordinal(view.rank)} of {view.fieldSize} on the board
         </p>
       )}
-      <Link href="/leaderboard" className="btn btn-ghost mt-6">
+      {/* SPEC §7 wants this most prominent of all on a busted week: the
+          near-miss is the most shareable moment the product has. Someone with
+          no entry has no grid to send, so they get the board link alone. */}
+      {view.verdict !== "no-entry" && (
+        <ShareButton build={shareResults} label="Share your result" />
+      )}
+      <Link
+        href="/leaderboard"
+        className={`btn btn-ghost ${view.verdict !== "no-entry" ? "mt-3" : "mt-6"}`}
+      >
         See the board
       </Link>
     </section>

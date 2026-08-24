@@ -143,3 +143,39 @@ export function ordinal(n: number): string {
       return `${n}th`;
   }
 }
+
+const WINDOW_FORMAT = new Intl.DateTimeFormat("en-US", {
+  weekday: "short",
+  hour: "numeric",
+  minute: "2-digit",
+  hour12: false,
+  timeZone: "America/New_York",
+});
+
+/**
+ * Which slot of the NFL week a kickoff belongs to, phrased as people say it:
+ * "the 4:25", "Sunday night", "Thursday night".
+ *
+ * This is what turns a share from a score into a story — "busted in the 4:25"
+ * is the line someone screenshots. Derived from Eastern time rather than a
+ * stored label, because the league's schedule is defined in Eastern and the
+ * lock time already tracks that same clock through the November DST shift.
+ */
+export function kickoffWindow(iso: string): string {
+  const parts = WINDOW_FORMAT.formatToParts(new Date(iso));
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+
+  if (weekday === "Thu") return "Thursday night";
+  if (weekday === "Fri") return "Friday";
+  if (weekday === "Sat") return "Saturday";
+  if (weekday === "Mon") return "Monday night";
+
+  // Sunday splits four ways. The boundaries sit between the windows rather than
+  // on them, so a 13:00 or a 16:05 or a 16:25 start all land where they should
+  // even when a game is moved by half an hour.
+  if (hour < 12) return "the London game";
+  if (hour < 15) return "the 1pm";
+  if (hour < 19) return "the 4:25";
+  return "Sunday night";
+}

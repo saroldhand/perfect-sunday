@@ -7,6 +7,43 @@ timer — the logic does not change, only what triggers it.
 All three live in the `private` schema, which PostgREST does not expose. There
 is no REST endpoint for them, so a signed-in user cannot reach them.
 
+## Migrations are applied by hand, and the frontend is not
+
+`.github/workflows/deploy.yml` builds and publishes the site on every push to
+`main`. It does **not** run migrations — nothing does. The database moves only
+when someone runs a migration in the Supabase SQL editor.
+
+So the two halves deploy independently, and the frontend always wins the race.
+Merging a branch whose code selects a column that its migration has not yet
+added puts a build in production that queries a database which cannot answer.
+
+This has already happened once. Migration 0013 added `teams.stats_season` and
+the same branch taught `getTeams` to select it. The branch merged, CI deployed,
+the migration had not been run, and PostgREST rejected the read with SQLSTATE
+42703. Because `WeekProvider` wraps every tabbed screen and treats a failed
+read as fatal, one decorative column blanked the whole app.
+
+Two rules, then:
+
+1. **Apply the migration before merging** the code that depends on it. Additive
+   migrations — a new nullable column, a new table — are safe to apply early
+   against the running site precisely because the old build does not know they
+   exist.
+2. **Let the client tolerate a column it cannot get**, wherever the data is not
+   load-bearing. `getTeams` now retries without the stat columns on 42703, so a
+   stat line goes missing instead of the product. That belt is not a licence to
+   skip rule 1; it only bounds the blast radius when rule 1 is missed.
+
+To check which migrations a database has, compare the files in `migrations/`
+against the schema itself — there is no migrations table:
+
+```sql
+-- 0013 applied?
+select count(*) from information_schema.columns
+where table_schema = 'public' and table_name = 'teams'
+  and column_name = 'stats_season';
+```
+
 ## Naming the week
 
 Every statement below identifies the week by `(season, week_number)` and never

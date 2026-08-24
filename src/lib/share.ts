@@ -1,4 +1,5 @@
 import { SHARE_DOMAIN } from "@/lib/constants";
+import { kickoffWindow } from "@/lib/format";
 
 /**
  * Pre-lock picks share. Same shape as the results grid — eight per line so it
@@ -34,12 +35,96 @@ function totalGlyph(side: string | null): string {
   return "—";
 }
 
-function chunk(items: string[], size: number): string[] {
+/**
+ * Eight to a line, so neither grid ever wraps in a narrow message bubble.
+ *
+ * Team abbreviations need a separator to be readable; squares must not have
+ * one, both because the grid reads as a block and because spaces would make
+ * eight of them wider than the line they are sized for.
+ */
+function chunk(items: string[], size: number, separator = " "): string[] {
   const lines: string[] = [];
   for (let i = 0; i < items.length; i += size) {
-    lines.push(items.slice(i, i + size).join(" "));
+    lines.push(items.slice(i, i + size).join(separator));
   }
   return lines;
+}
+
+/**
+ * How one pick came out. `null` is a game that has not been graded yet, which
+ * the grid must show as neither right nor wrong — a mid-Sunday share is the
+ * common case, not an edge one.
+ */
+export type Grade = boolean | null;
+
+const SQUARE = { correct: "\u{1F7E9}", wrong: "\u{1F7E5}", pending: "\u2B1C" };
+
+function square(grade: Grade): string {
+  if (grade === true) return SQUARE.correct;
+  if (grade === false) return SQUARE.wrong;
+  return SQUARE.pending;
+}
+
+/**
+ * The results grid — the share the whole product is pointed at.
+ *
+ * Same skeleton as the picks share: eight per line so it never wraps on a
+ * narrow phone, over/under block first, spread second, games in kickoff order.
+ * That ordering is the feature. Two people comparing grids are looking at the
+ * same game in the same position, which is what makes "which one did you miss?"
+ * work at all.
+ *
+ * The tally line carries the story rather than just the number. "29/32" is a
+ * score; "29/32 — busted in the 4:25" is the thing someone sends to a group
+ * chat. Callers build that clause with `bustedClause`.
+ */
+export function buildResultsShare(input: {
+  weekNumber: number;
+  totals: Grade[];
+  spreads: Grade[];
+  correct: number;
+  possible: number;
+  clause: string;
+}): string {
+  const { weekNumber, totals, spreads, correct, possible, clause } = input;
+  return [
+    `Perfect Sunday — Week ${weekNumber}`,
+    ...chunk(totals.map(square), 8, ""),
+    "over/under",
+    ...chunk(spreads.map(square), 8, ""),
+    "spread",
+    `${correct}/${possible} — ${clause}`,
+    SHARE_DOMAIN,
+  ].join("\n");
+}
+
+/**
+ * The clause after the tally: "busted in the 4:25", "still alive", "a perfect
+ * week".
+ *
+ * The first miss is found by position, not by time, which is the same thing
+ * only because every array here is in kickoff order — the ordering the deck,
+ * My Week and both grids all share. A miss on either layer of a game busts it.
+ */
+export function resultClause(input: {
+  kickoffs: string[];
+  totals: Grade[];
+  spreads: Grade[];
+}): string {
+  const { kickoffs, totals, spreads } = input;
+
+  const firstMiss = kickoffs.findIndex(
+    (_, i) => totals[i] === false || spreads[i] === false,
+  );
+  if (firstMiss !== -1) {
+    const when = kickoffWindow(kickoffs[firstMiss]);
+    // "busted in the 4:25" but "busted Sunday night" — the windows named as a
+    // slot take the preposition, the ones named as a day do not.
+    return when.startsWith("the ") ? `busted in ${when}` : `busted ${when}`;
+  }
+
+  const pending = totals.some((g) => g === null) || spreads.some((g) => g === null);
+  return pending ? "still alive" : "a perfect week";
 }
 
 export type ShareOutcome = "shared" | "copied" | "failed";

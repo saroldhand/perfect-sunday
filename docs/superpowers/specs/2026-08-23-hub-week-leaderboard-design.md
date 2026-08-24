@@ -305,7 +305,10 @@ chosen deliberately, but it was not spelled out above and should have been.
 
 Deliberately not in this piece of work:
 
-- Emoji-grid results share. Next after this, and it depends on this.
+- ~~Emoji-grid results share. Next after this, and it depends on this.~~
+  **Built 2026-08-24**, once this work had made grades reachable. It lives on
+  My Week and on the scored hub; the picks share stays on the deck and the
+  open/locked hub, because before lock there is nothing graded to send.
 - Odds provider integration and the three scheduled Edge Functions.
 - Groups, join codes, season standings, My Picks history.
 - A client path to `lock_week`. The operator still runs it by hand from the
