@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useWeek } from "@/components/app/WeekProvider";
+import { ShareButton } from "@/components/app/ShareButton";
 import { PickSummaryRow } from "@/components/week/PickSummaryRow";
 import { isGameComplete } from "@/lib/picks";
 import { formatLockTime } from "@/lib/format";
+import { buildPicksShare, buildResultsShare, resultClause } from "@/lib/share";
 
 export default function MyWeek() {
   const { phase, error, signedIn, week, games, results } = useWeek();
@@ -51,6 +53,33 @@ export default function MyWeek() {
 
   const graded = week.status === "scored";
   const picked = games.filter((g) => isGameComplete(results[g.id])).length;
+
+  // Grids and rows share one ordering — kickoff — which is what lets two people
+  // compare them row by row. Built from `games` so they cannot drift apart.
+  const kickoffs = games.map((g) => g.kickoff_at);
+  const totals = games.map((g) => results[g.id]?.totalCorrect ?? null);
+  const spreads = games.map((g) => results[g.id]?.spreadCorrect ?? null);
+
+  // Before lock there is nothing graded to show, so the share is the picks
+  // themselves; from lock onward it is the results grid, which is the share the
+  // product is actually pointed at.
+  const locked = week.status === "locked" || graded;
+  const shareLabel = locked ? "Share your week" : "Share your picks";
+  const buildShare = () =>
+    locked
+      ? buildResultsShare({
+          weekNumber: week.week_number,
+          totals,
+          spreads,
+          correct: [...totals, ...spreads].filter((g) => g === true).length,
+          possible: games.length * 2,
+          clause: resultClause({ kickoffs, totals, spreads }),
+        })
+      : buildPicksShare(
+          week.week_number,
+          games.map((g) => results[g.id]?.total ?? null),
+          games.map((g) => results[g.id]?.spread ?? null),
+        );
 
   return (
     <>
@@ -99,6 +128,10 @@ export default function MyWeek() {
           );
         })}
       </ul>
+
+      {/* Persistent, per SPEC §7: a live share is one tap during the games,
+          and the near-miss is the most shareable moment the product has. */}
+      <ShareButton build={buildShare} label={shareLabel} />
 
       {week.status === "open" && (
         <Link href="/picks" className="btn btn-gold mt-6">
