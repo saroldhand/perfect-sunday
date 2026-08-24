@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clockTo } from "./format";
+import { clockTo, statsProvenance } from "./format";
 
 const T0 = Date.parse("2026-09-10T20:00:00Z");
 const at = (ms: number) => new Date(T0 + ms).toISOString();
@@ -32,5 +32,24 @@ describe("clockTo", () => {
       days: 1,
       clock: "02:00:00",
     });
+  });
+});
+
+describe("statsProvenance", () => {
+  it("names the season so last year's record is never read as this year's", () => {
+    expect(statsProvenance({ stats_season: 2025, updated_through_week: 18 })).toBe(
+      "2025 final",
+    );
+    expect(statsProvenance({ stats_season: 2026, updated_through_week: 3 })).toBe(
+      "2026 thru wk 3",
+    );
+  });
+
+  it("returns null when provenance is missing, so the card shows no numbers", () => {
+    // The card gates its stat line on this. Unlabelled numbers are the failure
+    // mode being prevented, so an unknown season must not degrade to a bare
+    // record — it must suppress the line entirely.
+    expect(statsProvenance({ stats_season: null, updated_through_week: 18 })).toBeNull();
+    expect(statsProvenance({ stats_season: 2025, updated_through_week: null })).toBeNull();
   });
 });

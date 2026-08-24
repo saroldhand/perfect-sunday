@@ -293,8 +293,19 @@ Recorded so they are not mistaken for regressions:
   1 and 2 already used, so no literal id can go stale again. The demo reset was
   additionally scoped to the week — it had been clearing `total_correct` and
   `spread_correct` on every pick in every week.
-- `teams` has 32 rows and zero populated records, so the deck hides the
-  record and PPG line by design. Cards look emptier than intended.
+- ~~`teams` has 32 rows and zero populated records, so the deck hides the
+  record and PPG line by design. Cards look emptier than intended.~~ **Fixed
+  2026-08-24** by migration 0013, which seeds every club's real 2025 final
+  record, PPG and points allowed, computed from the 272 completed 2025
+  regular-season results published by nflverse rather than written from memory.
+
+  These are last season's numbers, so the card names the season: a new
+  `teams.stats_season` column travels with the four stat values, and
+  `statsProvenance()` renders it as "2025 final" once per card. The stat line
+  is gated on that label existing, so numbers can never appear without the
+  season they belong to — an unlabelled 14-3 beside a Week 1 matchup reads as
+  this year's form. From Week 2 the same label reads "2026 thru wk 2" as soon
+  as something writes current-season numbers, with no code change.
 - The rules page posts a $1,000 prize against roughly 1-in-665-million odds
   after the over/under change. Over-safe by a wide margin; the prize has room
   to rise.

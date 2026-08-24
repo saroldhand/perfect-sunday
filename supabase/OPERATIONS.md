@@ -111,6 +111,35 @@ If this ever returns a row, handle the prize manually. Multiple winners split
 the posted prize evenly — that is stated in the Official Rules and is what caps
 liability at exactly the posted amount regardless of entry volume.
 
+## Refreshing team stats
+
+Migration 0013 seeds every club's **2025 final** record and scoring averages,
+and the card labels them as such — "2025 final" sits in the card's eyebrow, so
+a 14-3 beside a Week 1 matchup is never mistaken for this year's form.
+
+That label is driven by data, not by a hardcoded string. From Week 2 onward,
+overwrite the rows with current-season numbers and move `stats_season` and
+`updated_through_week` with them; the card starts reading "2026 thru wk 2" on
+its own.
+
+```sql
+update public.teams t set
+  wins = v.wins, losses = v.losses, ties = v.ties,
+  ppg = v.ppg, papg = v.papg,
+  stats_season = 2026, updated_through_week = 2
+from (values
+  ('BUF', 2, 0, 0, 27.5, 17.0),
+  ('MIA', 1, 1, 0, 20.0, 21.5)
+  -- ...one row per club
+) as v (abbr, wins, losses, ties, ppg, papg)
+where t.abbr = v.abbr;
+```
+
+Both columns must move together. The card shows no numbers at all unless
+`stats_season` and `updated_through_week` are both set, which is deliberate:
+an unlabelled record is worse than a sparse card, because the reader supplies
+the wrong season themselves. Phase 2's `sync-slate` takes this step over.
+
 ## Resetting the demo
 
 To replay the demo week from scratch:

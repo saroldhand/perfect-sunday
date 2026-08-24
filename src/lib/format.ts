@@ -100,3 +100,27 @@ const LOCK_FORMAT = new Intl.DateTimeFormat("en-US", {
 export function formatLockTime(iso: string): string {
   return LOCK_FORMAT.format(new Date(iso));
 }
+
+/**
+ * Which season a club's record and scoring averages describe, phrased the way
+ * the card prints it: "2025 final" or "2026 thru wk 3".
+ *
+ * In Week 1 the only numbers that exist are last season's, and a record set
+ * flat beside a matchup reads as this year's form. Naming the season is what
+ * keeps that honest. Returns null when the stats carry no provenance, which is
+ * the card's signal to show no numbers at all rather than unlabelled ones.
+ */
+export function statsProvenance(team: {
+  stats_season: number | null;
+  updated_through_week: number | null;
+}): string | null {
+  if (team.stats_season === null || team.updated_through_week === null) {
+    return null;
+  }
+  return team.updated_through_week >= REGULAR_SEASON_WEEKS
+    ? `${team.stats_season} final`
+    : `${team.stats_season} thru wk ${team.updated_through_week}`;
+}
+
+/** An NFL regular season is eighteen weeks, so "through 18" means final. */
+const REGULAR_SEASON_WEEKS = 18;
