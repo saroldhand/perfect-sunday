@@ -38,6 +38,10 @@ export type Team = {
   // Null means the stats have never been filled in. The card hides the stat
   // line entirely in that case rather than printing a confident 0-0-0.
   updated_through_week: number | null;
+  // Which season the four numbers above describe. Carried so the card can say
+  // so out loud: in Week 1 these are last season's finals, and a record shown
+  // without its season reads as current form.
+  stats_season: number | null;
 };
 
 /**
@@ -88,7 +92,9 @@ export async function getGames(weekId: number): Promise<Game[]> {
 export async function getTeams(): Promise<Record<string, Team>> {
   const { data, error } = await supabase
     .from("teams")
-    .select("abbr, name, primary_color, wins, losses, ties, ppg, papg, updated_through_week");
+    .select(
+      "abbr, name, primary_color, wins, losses, ties, ppg, papg, updated_through_week, stats_season",
+    );
 
   if (error) throw new Error(error.message);
   return Object.fromEntries(((data ?? []) as Team[]).map((t) => [t.abbr, t]));

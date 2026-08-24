@@ -254,15 +254,44 @@ written here rather than left as a silent disagreement.
 
 **Deferred from §5 and §7.** Four items this document promised were not built:
 
-| Promised | Why it was deferred |
-|---|---|
-| Share button on the hub, in the `open`-complete and `locked` states | The deck's review screen already ships a working share of the same picks, so the growth loop this served is not blocked — only its second entry point is missing. |
-| Countdown to first kickoff on the `locked` hub | `countdownTo` hardcodes a "to lock" label and has other callers; changing it belonged in the feature work, not in a final fix wave. |
-| Board position on the `scored` hub | One number, and the hub already links straight to the full board. |
-| Pinning your own row into view on the leaderboard when it falls below the fold | Meaningless at the current scale of two players. The highlight shipped; the scroll behaviour did not. |
+| Promised | Why it was deferred | Status |
+|---|---|---|
+| Share button on the hub, in the `open`-complete and `locked` states | The deck's review screen already ships a working share of the same picks, so the growth loop this served is not blocked — only its second entry point is missing. | **Built 2026-08-24** |
+| Countdown to first kickoff on the `locked` hub | `countdownTo` hardcodes a "to lock" label and has other callers; changing it belonged in the feature work, not in a final fix wave. | **Built 2026-08-24** |
+| Board position on the `scored` hub | One number, and the hub already links straight to the full board. | **Built 2026-08-24** |
+| Pinning your own row into view on the leaderboard when it falls below the fold | Meaningless at the current scale of two players. The highlight shipped; the scroll behaviour did not. | Still owed |
 
 None is load-bearing for the loop the branch set out to close. All four remain
 worth building, and this table is the record that they are owed.
+
+### What the first three turned into
+
+Built on 2026-08-24, in the order listed.
+
+**Share on the hub.** The button and its "Copied" fallback moved out of
+`ReviewScreen` into `src/components/app/ShareButton.tsx`, which the hub and the
+review screen now both use — the same argument that moved `PickSummaryRow`
+out. On the `open` hub a complete set promotes sharing to the primary button
+and demotes "Change your picks" to a ghost; the `locked` hub gets the same
+button whenever the user has an entry.
+
+**Kickoff countdown.** `countdownTo` was left alone. The rebrand had since
+added `clockTo`, the per-second form the `open` hub already uses, so the locked
+state points at that instead and `countdownTo` keeps its two existing callers
+untouched. `TickingClock` gained a `label` prop because its aria-label
+hardcoded "until lines lock" and now serves both clocks. Once the first kickoff
+passes the clock is replaced by "Under way" rather than left reading zero.
+
+**Board position.** `hubView` takes `rank` and `fieldSize` and the scored state
+reads "2nd of 9 on the board", with `ordinal()` added to `lib/format`. The
+selector drops the rank when there is no entry: someone who never completed a
+set is not on the board, and a rank beside "Not scored" would contradict the
+sentence next to it.
+
+All three inputs were added to `HubInput` as **required** fields rather than
+optional ones. Optional would have let the page forget to pass one and silently
+render a hub with no countdown — the same class of failure as the `week_id = 1`
+no-op above. Required made every missing call site a compile error.
 
 **One security consequence §8 did not state.** Because `picks` becomes readable
 by anyone after a week locks (`picks_select_after_lock`, unchanged by this
@@ -286,11 +315,26 @@ Deliberately not in this piece of work:
 
 Recorded so they are not mistaken for regressions:
 
-- `supabase/OPERATIONS.md` hardcodes `week_id = 1` in steps 3, 4, and the
+- ~~`supabase/OPERATIONS.md` hardcodes `week_id = 1` in steps 3, 4, and the
   demo reset. The live week is **id 2**, so those statements silently affect
-  nothing. Small fix, separate change.
-- `teams` has 32 rows and zero populated records, so the deck hides the
-  record and PPG line by design. Cards look emptier than intended.
+  nothing. Small fix, separate change.~~ **Fixed 2026-08-24.** Every statement
+  in that doc now resolves the week by `(season, week_number)`, the form steps
+  1 and 2 already used, so no literal id can go stale again. The demo reset was
+  additionally scoped to the week — it had been clearing `total_correct` and
+  `spread_correct` on every pick in every week.
+- ~~`teams` has 32 rows and zero populated records, so the deck hides the
+  record and PPG line by design. Cards look emptier than intended.~~ **Fixed
+  2026-08-24** by migration 0013, which seeds every club's real 2025 final
+  record, PPG and points allowed, computed from the 272 completed 2025
+  regular-season results published by nflverse rather than written from memory.
+
+  These are last season's numbers, so the card names the season: a new
+  `teams.stats_season` column travels with the four stat values, and
+  `statsProvenance()` renders it as "2025 final" once per card. The stat line
+  is gated on that label existing, so numbers can never appear without the
+  season they belong to — an unlabelled 14-3 beside a Week 1 matchup reads as
+  this year's form. From Week 2 the same label reads "2026 thru wk 2" as soon
+  as something writes current-season numbers, with no code change.
 - The rules page posts a $1,000 prize against roughly 1-in-665-million odds
   after the over/under change. Over-safe by a wide margin; the prize has room
   to rise.

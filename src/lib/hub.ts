@@ -21,14 +21,34 @@ export type HubInput = {
   totalGames: number;
   completed: number;
   entry: EntryRow | null;
+  /** Earliest kickoff on the slate, for the locked week's countdown. */
+  firstKickoff: string | null;
+  /** Where this user sits on the board. Null when they are not on it. */
+  rank: number | null;
+  /** How many entries the board holds, so a rank reads as "2nd of 9". */
+  fieldSize: number;
 };
 
 export type HubView =
   | { kind: "no-week" }
   | { kind: "upcoming"; week: Week }
   | { kind: "open"; week: Week; completed: number; totalGames: number; allIn: boolean }
-  | { kind: "locked"; week: Week; totalGames: number; hasEntry: boolean }
-  | { kind: "scored"; week: Week; correct: number; possible: number; verdict: Verdict };
+  | {
+      kind: "locked";
+      week: Week;
+      totalGames: number;
+      hasEntry: boolean;
+      firstKickoff: string | null;
+    }
+  | {
+      kind: "scored";
+      week: Week;
+      correct: number;
+      possible: number;
+      verdict: Verdict;
+      rank: number | null;
+      fieldSize: number;
+    };
 
 /**
  * Which of five states the hub is in. Each gets its own layout rather than one
@@ -36,7 +56,7 @@ export type HubView =
  * correct" are not the same sentence with different numbers in it.
  */
 export function hubView(input: HubInput): HubView {
-  const { week, totalGames, completed, entry } = input;
+  const { week, totalGames, completed, entry, firstKickoff, rank, fieldSize } = input;
 
   if (!week) return { kind: "no-week" };
 
@@ -61,7 +81,7 @@ export function hubView(input: HubInput): HubView {
   if (week.status === "locked") {
     // An entry exists only for a complete set, so its absence is how we know
     // this user is not in this week at all.
-    return { kind: "locked", week, totalGames, hasEntry: entry !== null };
+    return { kind: "locked", week, totalGames, hasEntry: entry !== null, firstKickoff };
   }
 
   return {
@@ -70,5 +90,10 @@ export function hubView(input: HubInput): HubView {
     correct: entry?.correct_count ?? 0,
     possible: entry?.picks_possible ?? totalGames * 2,
     verdict: verdictOf(entry),
+    // No entry means no place on the board. A rank arriving alongside
+    // "not scored" would contradict the sentence next to it, so it is dropped
+    // here rather than guarded at every render site.
+    rank: entry ? rank : null,
+    fieldSize,
   };
 }

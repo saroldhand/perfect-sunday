@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hubView, verdictOf } from "@/lib/hub";
+import { hubView, verdictOf, type HubInput } from "@/lib/hub";
 import type { Week } from "@/lib/week";
 import type { EntryRow } from "@/lib/leaderboard";
 
@@ -26,6 +26,20 @@ function entry(over: Partial<EntryRow> = {}): EntryRow {
   };
 }
 
+/** hubView takes seven inputs and most tests care about two. */
+function input(over: Partial<HubInput> = {}): HubInput {
+  return {
+    week: week("open"),
+    totalGames: 16,
+    completed: 0,
+    entry: null,
+    firstKickoff: null,
+    rank: null,
+    fieldSize: 0,
+    ...over,
+  };
+}
+
 describe("verdictOf", () => {
   it("reports no-entry when the user never got an entry", () => {
     expect(verdictOf(null)).toBe("no-entry");
@@ -46,18 +60,18 @@ describe("verdictOf", () => {
 
 describe("hubView", () => {
   it("handles an empty database", () => {
-    expect(hubView({ week: null, totalGames: 0, completed: 0, entry: null }).kind).toBe(
+    expect(hubView(input({ week: null, totalGames: 0, completed: 0, entry: null })).kind).toBe(
       "no-week",
     );
   });
 
   it("handles a week with no slate posted", () => {
-    const view = hubView({ week: week("upcoming"), totalGames: 0, completed: 0, entry: null });
+    const view = hubView(input({ week: week("upcoming"), totalGames: 0, completed: 0, entry: null }));
     expect(view).toEqual({ kind: "upcoming", week: week("upcoming") });
   });
 
   it("reports progress while the week is open", () => {
-    const view = hubView({ week: week("open"), totalGames: 16, completed: 4, entry: null });
+    const view = hubView(input({ week: week("open"), totalGames: 16, completed: 4, entry: null }));
     expect(view).toEqual({
       kind: "open",
       week: week("open"),
@@ -68,27 +82,27 @@ describe("hubView", () => {
   });
 
   it("marks a complete set as all in", () => {
-    const view = hubView({ week: week("open"), totalGames: 16, completed: 16, entry: null });
+    const view = hubView(input({ week: week("open"), totalGames: 16, completed: 16, entry: null }));
     expect(view).toMatchObject({ kind: "open", allIn: true });
   });
 
   it("reports a locked week without a score", () => {
-    const view = hubView({ week: week("locked"), totalGames: 16, completed: 16, entry: entry() });
+    const view = hubView(input({ week: week("locked"), totalGames: 16, completed: 16, entry: entry() }));
     expect(view).toMatchObject({ kind: "locked", totalGames: 16, hasEntry: true });
   });
 
   it("knows a locked week has no entry for an incomplete picker", () => {
-    const view = hubView({ week: week("locked"), totalGames: 16, completed: 9, entry: null });
+    const view = hubView(input({ week: week("locked"), totalGames: 16, completed: 9, entry: null }));
     expect(view).toMatchObject({ kind: "locked", hasEntry: false });
   });
 
   it("reports the record and verdict once scored", () => {
-    const view = hubView({
+    const view = hubView(input({
       week: week("scored"),
       totalGames: 16,
       completed: 16,
       entry: entry({ correct_count: 21 }),
-    });
+    }));
     expect(view).toMatchObject({
       kind: "scored",
       correct: 21,
@@ -98,29 +112,53 @@ describe("hubView", () => {
   });
 
   it("reports no-entry for someone who never completed a set", () => {
-    const view = hubView({ week: week("scored"), totalGames: 16, completed: 9, entry: null });
+    const view = hubView(input({ week: week("scored"), totalGames: 16, completed: 9, entry: null }));
     expect(view).toMatchObject({ kind: "scored", verdict: "no-entry", correct: 0 });
   });
 
   it("treats an open week with no games as upcoming", () => {
     // A week can be flipped open before its slate is loaded. Showing "0 of 0
     // picked" with a CTA into an empty deck is worse than saying nothing yet.
-    const view = hubView({ week: week("open"), totalGames: 0, completed: 0, entry: null });
+    const view = hubView(input({ week: week("open"), totalGames: 0, completed: 0, entry: null }));
     expect(view.kind).toBe("upcoming");
   });
 
   it("does not disguise a locked week with no games as upcoming", () => {
-    const view = hubView({ week: week("locked"), totalGames: 0, completed: 0, entry: null });
+    const view = hubView(input({ week: week("locked"), totalGames: 0, completed: 0, entry: null }));
     expect(view).toMatchObject({ kind: "locked", totalGames: 0 });
   });
 
+  it("carries the first kickoff through to the locked week", () => {
+    const view = hubView(
+      input({ week: week("locked"), entry: entry(), firstKickoff: "2026-09-12T20:30:00Z" }),
+    );
+    expect(view).toMatchObject({ kind: "locked", firstKickoff: "2026-09-12T20:30:00Z" });
+  });
+
+  it("reports board position once scored", () => {
+    const view = hubView(
+      input({ week: week("scored"), entry: entry(), rank: 2, fieldSize: 9 }),
+    );
+    expect(view).toMatchObject({ kind: "scored", rank: 2, fieldSize: 9 });
+  });
+
+  it("drops the rank for someone with no entry", () => {
+    // Someone who never completed a set is not on the board, so a rank next to
+    // "not scored" would contradict the sentence beside it. hubView drops it
+    // rather than leaving every render site to guard.
+    const view = hubView(
+      input({ week: week("scored"), entry: null, rank: 4, fieldSize: 9 }),
+    );
+    expect(view).toMatchObject({ kind: "scored", verdict: "no-entry", rank: null });
+  });
+
   it("still reports a scored week's result when the slate is empty", () => {
-    const view = hubView({
+    const view = hubView(input({
       week: week("scored"),
       totalGames: 0,
       completed: 0,
       entry: entry({ correct_count: 21 }),
-    });
+    }));
     expect(view).toMatchObject({ kind: "scored", correct: 21, possible: 32 });
   });
 });

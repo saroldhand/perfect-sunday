@@ -1,7 +1,13 @@
 "use client";
 
 import { accentColor } from "@/lib/teamColor";
-import { formatKickoff, formatOdds, formatTotal, lineFor } from "@/lib/format";
+import {
+  formatKickoff,
+  formatOdds,
+  formatTotal,
+  lineFor,
+  statsProvenance,
+} from "@/lib/format";
 import type { Pick, TotalSide } from "@/lib/picks";
 import type { Game, Team } from "@/lib/week";
 
@@ -25,12 +31,20 @@ export function GameCard({
   const away = teams[game.away_team];
   const home = teams[game.home_team];
 
+  // Both clubs' stats come from the same load, so the season is stated once for
+  // the card rather than repeated on each band.
+  const statsLabel =
+    (away && statsProvenance(away)) ?? (home && statsProvenance(home)) ?? null;
+
   return (
     <article className={`card p-4 ${disabled ? "opacity-40" : ""}`}>
-      <p className="eyebrow mb-3">
-        {formatKickoff(game.kickoff_at)}
-        {disabled && " · kicked off"}
-      </p>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <p className="eyebrow">
+          {formatKickoff(game.kickoff_at)}
+          {disabled && " · kicked off"}
+        </p>
+        {statsLabel && <p className="eyebrow shrink-0">{statsLabel}</p>}
+      </div>
 
       <TeamBand team={away} />
       <p
@@ -89,10 +103,11 @@ export function GameCard({
 function TeamBand({ team }: { team?: Team }) {
   if (!team) return null;
 
-  // Stats are shown only once they have actually been filled in. A team whose
-  // updated_through_week is null would otherwise render a confident 0-0-0,
-  // which reads as a real record rather than missing data.
-  const hasStats = team.updated_through_week !== null;
+  // Stats are shown only once they have actually been filled in AND carry the
+  // season they belong to. A team whose stats are unset would otherwise render
+  // a confident 0-0-0, and one whose season is unknown would print last year's
+  // record as though it were this year's.
+  const hasStats = statsProvenance(team) !== null;
 
   const color = accentColor(team.primary_color);
 
