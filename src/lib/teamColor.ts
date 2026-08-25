@@ -1,9 +1,9 @@
 // Several clubs have a near-black primary colour — Raiders #000000, Bears
 // #0B162A, Browns #311D00 — which is invisible as a thin accent against the
-// #070B15 page background. The teams table stores each club's true colour, so
+// #101A2E page background. The teams table stores each club's true colour, so
 // the correction happens here at render time instead of being baked into data.
 
-const PAGE_BG_LUMINANCE = 0.0034; // relative luminance of #070B15
+const PAGE_BG_LUMINANCE = 0.0105; // relative luminance of #101A2E
 const MIN_CONTRAST = 2.2; // enough for a 3px bar to read at arm's length
 
 function srgbToLinear(channel: number): number {

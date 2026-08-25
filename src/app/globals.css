@@ -7,12 +7,12 @@
    component classes below — without it Tailwind tree-shakes them out of :root
    and font-display silently falls back to the system stack. */
 @theme static {
-  --color-bg: #070b15;
-  --color-surface: #0d1526;
-  --color-surface-raised: #16213a;
-  --color-border: #253352;
+  --color-bg: #101a2e;
+  --color-surface: #1a253d;
+  --color-surface-raised: #25314e;
+  --color-border: #37476f;
   --color-text: #f5f7fc;
-  --color-text-muted: #93a1bd;
+  --color-text-muted: #a2b0cb;
   --color-accent: #ffb424;
   --color-accent-deep: #ff7a1a;
 
@@ -58,8 +58,8 @@ body {
     z-index: -1;
     pointer-events: none;
     background:
-      radial-gradient(120% 55% at 50% -12%, rgba(255, 173, 36, 0.16), transparent 60%),
-      radial-gradient(90% 50% at 88% 110%, rgba(56, 108, 255, 0.12), transparent 60%);
+      radial-gradient(120% 55% at 50% -12%, rgba(255, 173, 36, 0.2), transparent 60%),
+      radial-gradient(90% 50% at 88% 110%, rgba(56, 108, 255, 0.13), transparent 60%);
   }
 
   /* The brand device: condensed 900-weight caps on an -8° slant, the second
@@ -142,7 +142,7 @@ body {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-card);
     background:
-      linear-gradient(180deg, rgba(255, 255, 255, 0.03), transparent 40%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.045), transparent 40%),
       var(--color-surface);
   }
 
@@ -155,8 +155,8 @@ body {
     border-radius: var(--radius-card);
     padding: 1.5rem 1.25rem;
     background:
-      radial-gradient(140% 90% at 50% -30%, rgba(255, 180, 36, 0.14), transparent 55%),
-      linear-gradient(180deg, #131d33, #0d1526);
+      radial-gradient(140% 90% at 50% -30%, rgba(255, 180, 36, 0.16), transparent 55%),
+      linear-gradient(180deg, #212e4a, #1a253d);
   }
   .billboard::before {
     content: "";
