@@ -28,12 +28,7 @@ export function ReviewScreen({
   const missing = games.filter((g) => !isGameComplete(picks[g.id]));
   const allIn = missing.length === 0;
 
-  const shareTextFor = () =>
-    buildPicksShare(
-      weekNumber,
-      games.map((g) => picks[g.id]?.total ?? null),
-      games.map((g) => picks[g.id]?.spread ?? null),
-    );
+  const shareTextFor = () => buildPicksShare(weekNumber, games, picks);
 
   if (locked) {
     return (

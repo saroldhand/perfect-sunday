@@ -82,12 +82,8 @@ export default function Hub() {
     fieldSize: boardEntries.length,
   });
 
-  const shareTextFor = () =>
-    buildPicksShare(
-      week?.week_number ?? 0,
-      games.map((g) => results[g.id]?.total ?? null),
-      games.map((g) => results[g.id]?.spread ?? null),
-    );
+  // A Result is a Pick with grades attached, so the map passes straight in.
+  const shareTextFor = () => buildPicksShare(week?.week_number ?? 0, games, results);
 
   // Once the week is scored the grid is what people send, not the picks. Both
   // read the same games in the same kickoff order.

@@ -1,46 +1,55 @@
 import { SHARE_DOMAIN } from "@/lib/constants";
-import { kickoffWindow } from "@/lib/format";
+import { formatTotal, kickoffWindow, lineFor } from "@/lib/format";
+import type { PickMap } from "@/lib/picks";
+import type { Game } from "@/lib/week";
 
 /**
- * Pre-lock picks share. Same shape as the results grid — eight per line so it
- * never wraps on a narrow phone, total block first, games in kickoff order —
- * but with the picks themselves instead of squares. Kickoff order is what lets
- * two people line their lists up and argue about the same game.
+ * Pre-lock picks share. One self-explanatory line per game, real numbers
+ * included — "DAL @ NYG — NYG +3.5 · Over 45.5" — because a first-time
+ * recipient in a group chat has to get the stakes without ever having seen
+ * the product. The cryptic Wordle-grid form the spec sketched assumed the
+ * recipient already knew the game; a line they can argue with ("BUF -9.5??")
+ * is what makes them reply, and the reply is the growth loop.
  *
- * Totals are single letters rather than the words. "OVER UNDER OVER…" eight
- * across is far past the width of an iMessage bubble, and the whole point of a
- * text share is that it never wraps.
+ * Games stay in kickoff order so two people comparing slates are reading the
+ * same games in the same positions.
  *
  * Plain text on purpose. No image generation, no hosting, no load time; it
  * pastes into iMessage, WhatsApp and Slack identically.
  */
 export function buildPicksShare(
   weekNumber: number,
-  totals: (string | null)[],
-  spreads: (string | null)[],
+  games: Game[],
+  picks: PickMap,
 ): string {
   return [
     `Perfect Sunday — Week ${weekNumber}`,
-    ...chunk(totals.map(totalGlyph), 8),
-    "over/under",
-    ...chunk(spreads.map((s) => s ?? "—"), 8),
-    "spread",
+    `My ${games.length * 2} picks. Every one has to hit.`,
+    "Perfect week wins $1,000.",
+    "",
+    ...games.map((game) => gameLine(game, picks[game.id])),
+    "",
+    "Fade me or beat me. Free to play:",
     SHARE_DOMAIN,
   ].join("\n");
 }
 
-function totalGlyph(side: string | null): string {
-  if (side === "OVER") return "O";
-  if (side === "UNDER") return "U";
-  return "—";
+function gameLine(game: Game, pick: PickMap[string] | undefined): string {
+  const spread =
+    pick?.spread != null
+      ? `${pick.spread} ${lineFor(game.spread, pick.spread === game.home_team ? "home" : "away")}`
+      : "—";
+  const total =
+    pick?.total != null
+      ? `${pick.total === "OVER" ? "Over" : "Under"} ${formatTotal(game.total)}`
+      : "—";
+  return `${game.away_team} @ ${game.home_team} — ${spread} · ${total}`;
 }
 
 /**
- * Eight to a line, so neither grid ever wraps in a narrow message bubble.
- *
- * Team abbreviations need a separator to be readable; squares must not have
- * one, both because the grid reads as a block and because spaces would make
- * eight of them wider than the line they are sized for.
+ * Eight squares to a line, so the grid never wraps in a narrow message
+ * bubble. Joined without a separator: the grid reads as a block, and spaces
+ * would make eight squares wider than the line they are sized for.
  */
 function chunk(items: string[], size: number, separator = " "): string[] {
   const lines: string[] = [];
@@ -68,11 +77,12 @@ function square(grade: Grade): string {
 /**
  * The results grid — the share the whole product is pointed at.
  *
- * Same skeleton as the picks share: eight per line so it never wraps on a
- * narrow phone, over/under block first, spread second, games in kickoff order.
- * That ordering is the feature. Two people comparing grids are looking at the
- * same game in the same position, which is what makes "which one did you miss?"
- * work at all.
+ * Unlike the picks share, this one stays a grid: green and red squares carry
+ * their own drama and need no explanation. Eight per line so it never wraps
+ * on a narrow phone, over/under block first, spread second, games in kickoff
+ * order. That ordering is the feature. Two people comparing grids are looking
+ * at the same game in the same position, which is what makes "which one did
+ * you miss?" work at all.
  *
  * The tally line carries the story rather than just the number. "29/32" is a
  * score; "29/32 — busted in the 4:25" is the thing someone sends to a group

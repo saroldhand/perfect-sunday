@@ -75,11 +75,7 @@ export default function MyWeek() {
           possible: games.length * 2,
           clause: resultClause({ kickoffs, totals, spreads }),
         })
-      : buildPicksShare(
-          week.week_number,
-          games.map((g) => results[g.id]?.total ?? null),
-          games.map((g) => results[g.id]?.spread ?? null),
-        );
+      : buildPicksShare(week.week_number, games, results);
 
   return (
     <>

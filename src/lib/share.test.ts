@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { buildResultsShare, resultClause, type Grade } from "@/lib/share";
+import {
+  buildPicksShare,
+  buildResultsShare,
+  resultClause,
+  type Grade,
+} from "@/lib/share";
 import { SHARE_DOMAIN } from "@/lib/constants";
+import type { Game } from "@/lib/week";
+import type { PickMap } from "@/lib/picks";
 
 const CORRECT = "\u{1F7E9}";
 const WRONG = "\u{1F7E5}";
@@ -154,5 +161,58 @@ describe("kickoff windows through resultClause", () => {
         spreads: [true],
       }),
     ).toBe("busted in the 4:25");
+  });
+});
+
+const game = (over: Partial<Game>): Game => ({
+  id: "g1",
+  away_team: "DAL",
+  home_team: "NYG",
+  kickoff_at: "2026-09-13T17:00:00Z",
+  spread: -3.5,
+  total: 45.5,
+  over_odds: -110,
+  under_odds: -110,
+  status: "scheduled",
+  home_score: null,
+  away_score: null,
+  ...over,
+});
+
+describe("buildPicksShare", () => {
+  const games = [
+    game({ id: "g1", away_team: "DAL", home_team: "NYG", spread: 3.5, total: 45.5 }),
+    game({ id: "g2", away_team: "NYJ", home_team: "BUF", spread: -9.5, total: 38.5 }),
+  ];
+  const picks: PickMap = {
+    g1: { total: "OVER", spread: "NYG" },
+    g2: { total: "UNDER", spread: "BUF" },
+  };
+
+  it("writes one self-explanatory line per game with real numbers", () => {
+    const text = buildPicksShare(3, games, picks);
+    expect(text).toContain("DAL @ NYG — NYG +3.5 · Over 45.5");
+    expect(text).toContain("NYJ @ BUF — BUF -9.5 · Under 38.5");
+  });
+
+  it("leads with the stakes and ends with the invite and link", () => {
+    const lines = buildPicksShare(3, games, picks).split("\n");
+    expect(lines[0]).toBe("Perfect Sunday — Week 3");
+    expect(lines[1]).toBe("My 4 picks. Every one has to hit.");
+    expect(lines[2]).toBe("Perfect week wins $1,000.");
+    expect(lines.at(-2)).toBe("Fade me or beat me. Free to play:");
+    // The spec ships the bare domain, no protocol — chat apps linkify it and
+    // it reads less like spam in a group text.
+    expect(lines.at(-1)).toBe("saroldhand.github.io/perfect-sunday");
+  });
+
+  it("shows the away side's line when the away team is the spread pick", () => {
+    const text = buildPicksShare(3, games, { ...picks, g1: { total: "OVER", spread: "DAL" } });
+    expect(text).toContain("DAL @ NYG — DAL -3.5 · Over 45.5");
+  });
+
+  it("marks an unpicked side rather than dropping the game", () => {
+    const text = buildPicksShare(3, games, { ...picks, g2: { total: null, spread: "BUF" } });
+    expect(text).toContain("NYJ @ BUF — BUF -9.5 · —");
   });
 });

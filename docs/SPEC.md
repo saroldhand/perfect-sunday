@@ -280,7 +280,20 @@ perfectsunday.app
 
 Rules for the grid: eight squares per line so it never wraps on a narrow phone. Moneyline block first, spread block second. Games in kickoff order, so two people comparing grids are looking at the same games in the same positions — that's what makes "which one did you miss?" work. Use ⬜ for games not yet played so a mid-Sunday share still reads correctly.
 
-Picks share (pre-lock) is the same shape with team abbreviations instead of squares, so friends can rib each other before kickoff.
+Picks share (pre-lock) is different: it is *not* the grid. A results grid is self-evident — green and red squares carry their own drama — but a pre-lock grid of team abbreviations means nothing to a first-time recipient, and the picks share is the one most likely to land in front of someone who has never played. It reads as one plain line per game with the real numbers, framed by the stakes, so every line is something a recipient can argue with — and the argument is the growth loop. *(Amended 2026-08-25; the original spec had the picks share reuse the grid shape.)*
+
+```
+Perfect Sunday — Week 3
+My 32 picks. Every one has to hit.
+Perfect week wins $1,000.
+
+DAL @ NYG — NYG +3.5 · Over 45.5
+NYJ @ BUF — BUF -9.5 · Under 38.5
+…one line per game, kickoff order…
+
+Fade me or beat me. Free to play:
+perfectsunday.app
+```
 
 ### Where the share button lives
 
