@@ -42,7 +42,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#070B15",
+  themeColor: "#101A2E",
   // The pick targets are already far above 44pt; zoom stays enabled because
   // disabling it is an accessibility failure, not a polish detail.
   width: "device-width",
