@@ -4,11 +4,12 @@ import { PickSummaryRow } from "@/components/week/PickSummaryRow";
 import { ShareButton } from "@/components/app/ShareButton";
 import { isGameComplete, type PickMap } from "@/lib/picks";
 import { buildPicksShare } from "@/lib/share";
-import type { Game } from "@/lib/week";
+import type { Game, Team } from "@/lib/week";
 
 type Props = {
   weekNumber: number;
   games: Game[];
+  teams: Record<string, Team>;
   picks: PickMap;
   onJump: (index: number) => void;
   onLock: () => void;
@@ -19,6 +20,7 @@ type Props = {
 export function ReviewScreen({
   weekNumber,
   games,
+  teams,
   picks,
   onJump,
   onLock,
@@ -59,9 +61,9 @@ export function ReviewScreen({
         {games.map((game, index) => (
           <PickSummaryRow
             key={game.id}
-            index={index}
             game={game}
             pick={picks[game.id]}
+            team={picks[game.id]?.spread ? teams[picks[game.id].spread!] : undefined}
             onJump={() => onJump(index)}
           />
         ))}

@@ -197,6 +197,65 @@ body {
   .pick-option[aria-pressed="true"] {
     animation: pop 180ms ease-out;
   }
+
+  /* One cell of the week strip. Square rather than round on purpose: the strip
+     is the on-screen twin of the emoji grid the share builds, and that grid is
+     made of squares. Flexed so a 16-game slate and an 11-game one both fill
+     the same width. */
+  .pip {
+    flex: 1 1 0;
+    min-width: 0;
+    /* Capped so a six-game playoff slate reads as pips rather than as stripes;
+       a sixteen-game one sits comfortably under this and fills the row. */
+    max-width: 22px;
+    height: 14px;
+    border-radius: 3px;
+    border: 1px solid var(--color-border);
+    background: transparent;
+  }
+  /* Gold means chosen, exactly as it does on the deck. It deliberately does
+     not mean good — most of the week is spent picked and not yet graded. */
+  .pip-picked {
+    border-color: var(--color-accent);
+    background: var(--color-accent);
+  }
+  .pip-correct {
+    border-color: var(--color-correct);
+    background: var(--color-correct);
+  }
+  .pip-wrong {
+    border-color: var(--color-wrong);
+    background: var(--color-wrong);
+  }
+
+  /* A pick, stated as an object rather than as prose. The chip itself carries
+     the verdict once graded, which reads at arm's length in a way an inline
+     tick never did. */
+  .pick-chip {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.375rem;
+    min-width: 0;
+    padding: 0.3rem 0.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    background: var(--color-surface-raised);
+  }
+  /* The side you have not chosen yet. Dashed and hollow so a half-finished
+     game shows exactly which half is missing, which the old single
+     "Not picked" line could not say. */
+  .pick-chip-empty {
+    border-style: dashed;
+    background: transparent;
+  }
+  .pick-chip-correct {
+    border-color: color-mix(in srgb, var(--color-correct) 55%, transparent);
+    background: color-mix(in srgb, var(--color-correct) 14%, transparent);
+  }
+  .pick-chip-wrong {
+    border-color: color-mix(in srgb, var(--color-wrong) 55%, transparent);
+    background: color-mix(in srgb, var(--color-wrong) 14%, transparent);
+  }
 }
 
 @keyframes ticker-scroll {
