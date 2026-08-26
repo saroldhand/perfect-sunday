@@ -4,12 +4,13 @@ import Link from "next/link";
 import { useWeek } from "@/components/app/WeekProvider";
 import { ShareButton } from "@/components/app/ShareButton";
 import { PickSummaryRow } from "@/components/week/PickSummaryRow";
+import { WeekGlance } from "@/components/week/WeekGlance";
 import { isGameComplete } from "@/lib/picks";
 import { formatLockTime } from "@/lib/format";
 import { buildPicksShare, buildResultsShare, resultClause } from "@/lib/share";
 
 export default function MyWeek() {
-  const { phase, error, signedIn, week, games, results } = useWeek();
+  const { phase, error, signedIn, week, games, results, teams } = useWeek();
 
   if (phase === "loading") return <Skeleton />;
   if (phase === "error") {
@@ -90,26 +91,25 @@ export default function MyWeek() {
         ) : week.status === "locked" ? (
           "Locked. Grades appear as games finish."
         ) : (
-          <>
-            <span className="tabular text-[var(--color-text)]">
-              {picked} of {games.length}
-            </span>{" "}
-            picked · locks {formatLockTime(week.locks_at)}
-          </>
+          // The strip below carries the count, so this carries the deadline.
+          <>Locks {formatLockTime(week.locks_at)}</>
         )}
       </p>
 
-      {/* Kickoff order, the same order as the deck and the share grid. It is
-          what lets two people line their lists up row by row. */}
-      <ul className="card mt-5 divide-y divide-[var(--color-border)]">
-        {games.map((game, index) => {
+      <WeekGlance games={games} results={results} />
+
+      {/* Kickoff order, the same order as the glance strip above, the deck, and
+          the share grid. It is what lets two people line their lists up row by
+          row. */}
+      <ul className="card mt-4 divide-y divide-[var(--color-border)]">
+        {games.map((game) => {
           const result = results[game.id];
           return (
             <PickSummaryRow
               key={game.id}
-              index={index}
               game={game}
               pick={result}
+              team={result?.spread ? teams[result.spread] : undefined}
               grade={
                 result
                   ? { total: result.totalCorrect, spread: result.spreadCorrect }

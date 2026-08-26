@@ -169,6 +169,7 @@ export function PickDeck({ userId, week, games, teams, initialPicks }: Props) {
           <ReviewScreen
             weekNumber={week.week_number}
             games={games}
+            teams={teams}
             picks={picks}
             onJump={goTo}
             onLock={() => {

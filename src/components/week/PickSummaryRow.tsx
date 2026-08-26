@@ -1,16 +1,19 @@
 "use client";
 
+import { accentColor } from "@/lib/teamColor";
 import { lineFor, formatKickoff, formatTotal } from "@/lib/format";
 import type { Pick } from "@/lib/picks";
-import type { Game } from "@/lib/week";
+import type { Game, Team } from "@/lib/week";
 
 export type Grade = { total: boolean | null; spread: boolean | null };
 export type Score = { home: number | null; away: number | null };
 
 type Props = {
-  index: number;
   game: Game;
   pick: Pick | undefined;
+  /** The club backed on the spread. Supplies the row's colour; omitted before
+   *  a spread is picked, which is what makes an untouched row read as blank. */
+  team?: Team;
   /** Omitted before scoring. A null field means that side is not graded yet. */
   grade?: Grade;
   score?: Score;
@@ -21,43 +24,60 @@ type Props = {
 /**
  * One game's line in a list of picks. Shared by the review screen and My Week
  * so the two cannot drift apart the next time a line format changes.
+ *
+ * Each side of the game is its own chip rather than a clause in a sentence:
+ * the chip carries the club's colour, and once graded it carries the verdict
+ * in its own border and fill, which reads at arm's length in a way an inline
+ * tick never did.
  */
-export function PickSummaryRow({ index, game, pick, grade, score, onJump }: Props) {
-  const complete = Boolean(pick?.total && pick?.spread);
+export function PickSummaryRow({ game, pick, team, grade, score, onJump }: Props) {
+  const color = team ? accentColor(team.primary_color) : null;
+
+  const final =
+    score && score.home !== null && score.away !== null
+      ? `Final ${score.away}–${score.home}`
+      : null;
 
   const body = (
     <>
-      <span className="tabular w-6 shrink-0 text-xs text-[var(--color-text-muted)]">
-        {index + 1}
-      </span>
-      <span className="font-[family-name:var(--font-display)] w-28 shrink-0 text-base font-semibold uppercase">
-        {game.away_team} @ {game.home_team}
-      </span>
-      <span className="min-w-0 flex-1 text-xs text-[var(--color-text-muted)]">
-        {complete ? (
-          <>
-            <Mark correct={grade?.total} />
-            <span className="text-[var(--color-text)]">
-              {pick!.total === "OVER" ? "Over" : "Under"}
-            </span>{" "}
-            <span className="tabular">{formatTotal(game.total)}</span> ·{" "}
-            <Mark correct={grade?.spread} />
-            <span className="text-[var(--color-text)]">{pick!.spread}</span>{" "}
-            <span className="tabular">
-              {lineFor(game.spread, pick!.spread === game.home_team ? "home" : "away")}
-            </span>
-            {score && score.home !== null && score.away !== null && (
-              <span className="tabular block text-[var(--color-text-muted)]">
-                Final {score.away}–{score.home}
-              </span>
-            )}
-          </>
-        ) : (
-          <span>Not picked · {formatKickoff(game.kickoff_at)}</span>
-        )}
-      </span>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-[family-name:var(--font-display)] text-lg font-bold uppercase leading-none">
+          {game.away_team}{" "}
+          <span className="text-[var(--color-text-muted)]">@</span> {game.home_team}
+        </span>
+        <span className="tabular shrink-0 text-xs text-[var(--color-text-muted)]">
+          {final ?? formatKickoff(game.kickoff_at)}
+        </span>
+      </div>
+
+      {/* Total first, then spread — the order the card and the share grid both
+          use, so all three agree about which block is which. */}
+      <div className="mt-2 flex gap-2">
+        <PickChip
+          label={pick?.total ? (pick.total === "OVER" ? "Over" : "Under") : "Total"}
+          detail={game.total === null ? undefined : formatTotal(game.total)}
+          grade={grade?.total}
+          chosen={Boolean(pick?.total)}
+        />
+        <PickChip
+          label={pick?.spread ?? "Spread"}
+          detail={
+            pick?.spread
+              ? lineFor(game.spread, pick.spread === game.home_team ? "home" : "away")
+              : undefined
+          }
+          grade={grade?.spread}
+          chosen={Boolean(pick?.spread)}
+        />
+      </div>
     </>
   );
+
+  // A 3px edge either way, so a coloured row and a blank one still line up.
+  const shell = {
+    borderLeftColor: color ?? "transparent",
+    background: color ? `linear-gradient(90deg, ${color}24, transparent 60%)` : undefined,
+  };
 
   if (onJump) {
     return (
@@ -65,7 +85,8 @@ export function PickSummaryRow({ index, game, pick, grade, score, onJump }: Prop
         <button
           type="button"
           onClick={onJump}
-          className="flex w-full items-center gap-3 px-4 py-3 text-left"
+          style={shell}
+          className="block w-full border-l-[3px] px-4 py-3 text-left"
         >
           {body}
         </button>
@@ -73,23 +94,65 @@ export function PickSummaryRow({ index, game, pick, grade, score, onJump }: Prop
     );
   }
 
-  return <li className="flex items-center gap-3 px-4 py-3">{body}</li>;
+  return (
+    <li style={shell} className="border-l-[3px] px-4 py-3">
+      {body}
+    </li>
+  );
 }
 
 /**
+ * One side of one game.
+ *
  * A push — a combined score landing exactly on the total, or a spread landing
- * exactly on the number — is recorded as correct for both sides. It shows a
- * check, not a third state: inventing one here would contradict both the
+ * exactly on the number — is recorded as correct for both sides. It reads as
+ * correct here, not as a third state: inventing one would contradict both the
  * database and the rules page.
  */
-function Mark({ correct }: { correct?: boolean | null }) {
-  if (correct === undefined || correct === null) return null;
+function PickChip({
+  label,
+  detail,
+  grade,
+  chosen,
+}: {
+  label: string;
+  detail?: string;
+  grade?: boolean | null;
+  chosen: boolean;
+}) {
+  const graded = chosen && grade !== undefined && grade !== null;
+
+  const shell = !chosen
+    ? "pick-chip-empty"
+    : graded
+      ? grade
+        ? "pick-chip-correct"
+        : "pick-chip-wrong"
+      : "";
+
+  const text = !chosen
+    ? "text-[var(--color-text-muted)]"
+    : graded
+      ? grade
+        ? "text-[var(--color-correct)]"
+        : "text-[var(--color-wrong)]"
+      : "";
+
   return (
     <span
-      aria-label={correct ? "correct" : "wrong"}
-      className={`mr-1 ${correct ? "text-[var(--color-correct)]" : "text-[var(--color-wrong)]"}`}
+      className={`pick-chip min-w-0 flex-1 justify-center ${shell}`}
+      aria-label={graded ? `${label}, ${grade ? "correct" : "wrong"}` : undefined}
     >
-      {correct ? "✓" : "✗"}
+      <span
+        className={`truncate font-[family-name:var(--font-display)] text-base font-bold uppercase leading-none ${text}`}
+      >
+        {label}
+      </span>
+      {detail && (
+        <span className="tabular shrink-0 text-xs text-[var(--color-text-muted)]">
+          {detail}
+        </span>
+      )}
     </span>
   );
 }
