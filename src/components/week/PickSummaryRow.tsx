@@ -7,7 +7,13 @@ import type { Pick } from "@/lib/picks";
 import type { Game, Team } from "@/lib/week";
 
 export type Grade = { total: boolean | null; spread: boolean | null };
-export type Score = { home: number | null; away: number | null };
+export type Score = {
+  home: number | null;
+  away: number | null;
+  /** Distinguishes "Final 24–17" from a game still running, whose score
+   *  shows bare — moving numbers are their own "live" label. */
+  final: boolean;
+};
 
 type Props = {
   game: Game;
@@ -34,9 +40,10 @@ type Props = {
 export function PickSummaryRow({ game, pick, team, grade, score, onJump }: Props) {
   const color = team ? accentColor(team.primary_color) : null;
 
-  const final =
+  // Away first, matching the "AWAY @ HOME" order the row reads in.
+  const scoreline =
     score && score.home !== null && score.away !== null
-      ? `Final ${score.away}–${score.home}`
+      ? `${score.final ? "Final " : ""}${score.away}–${score.home}`
       : null;
 
   const body = (
@@ -47,7 +54,7 @@ export function PickSummaryRow({ game, pick, team, grade, score, onJump }: Props
           <span className="text-[var(--color-text-muted)]">@</span> {game.home_team}
         </span>
         <span className="tabular shrink-0 text-xs text-[var(--color-text-muted)]">
-          {final ?? formatKickoff(game.kickoff_at)}
+          {scoreline ?? formatKickoff(game.kickoff_at)}
         </span>
       </div>
 

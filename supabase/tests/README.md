@@ -1,6 +1,6 @@
 # Database tests
 
-Four suites. `rls.sql` asserts the deny case for every policy that guards user data. It is
+Five suites. `rls.sql` asserts the deny case for every policy that guards user data. It is
 the difference between "RLS is enabled" and "RLS works".
 
 Run it against the project database. Statements marked **Expect ERROR 42501**
@@ -122,3 +122,31 @@ Tests 8 and 14-16 guard defaults rather than logic. The source CSV lists
 invisibly; and `EXECUTE` is granted to PUBLIC by default on a new function,
 which would put line-writing within reach of the publishable key that ships in
 the build.
+
+## `scores.sql` — applying scores and grading in the same call
+
+Covers `private.apply_week_scores` and `private.next_week_needing_scores`
+(0017), plus the grants on their `public` wrappers. Fixture weeks 970-972,
+transaction ending in ROLLBACK. Written 2026-08-27; run it against the live
+project once 0017 is applied — 21 assertions.
+
+| Test | Asserts |
+|---|---|
+| 1 | `next_week_needing_scores` takes the started, locked week — not one that has not kicked off, not one still open |
+| 2-3 | An open week accepts no scores and its game is untouched |
+| 4-5 | A live score lands as `in_progress` with the score |
+| 6 | A live score grades nothing |
+| 7-9 | A final lands, is counted, and a partial slate does not score the week |
+| 10-11 | The same call graded the pick and moved the entry |
+| 12-13 | The feed cannot rewrite a final; the score stands |
+| 14-16 | The last final scores the week and completes the entry |
+| 17 | A scored week drops out of the queue |
+| 18 | A later sweep of the scored week is a quiet no-op |
+| 19-21 | `anon` and `authenticated` cannot execute the score writer; `service_role` can |
+
+Test 6 pairs with the schema fact it leans on: `score_week` grades only games
+whose *status* is final, so writing live scores is safe. Tests 12-13 are the
+file's reason to exist — a final's grades may already be on someone's screen,
+and only the operator's `set_final_score` may overrule one. Tests 19-21 matter
+doubly here: through in-call grading, this door does not just write scores, it
+scores the week.

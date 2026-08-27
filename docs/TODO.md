@@ -12,6 +12,26 @@ three waits.
 
 ---
 
+## ⚠ Do next — operator, high priority
+
+**Switch on `sync-scores`.** The code merged 2026-08-27, but it is inert until
+these run — and without them nothing marks games final, so no pick grades on
+game day. All dashboard/CLI steps only the operator can do; the repo side is
+finished. Details for each live in
+[supabase/OPERATIONS.md](../supabase/OPERATIONS.md).
+
+1. [ ] Apply migration `0017_sync_scores.sql` in the Supabase SQL editor.
+2. [ ] Run [supabase/tests/scores.sql](../supabase/tests/scores.sql) there —
+       expect 21 of 21 PASS.
+3. [ ] `supabase functions deploy sync-scores`
+4. [ ] Schedule it — the `*/5 * * * *` `cron.schedule` snippet in
+       OPERATIONS.md (needs `pg_cron` and `pg_net` enabled).
+5. [ ] On its first game day, run it once by hand and check `fetched` against
+       `updated` in the report — the feed's shape is observed, not documented,
+       and this is the check that proves it.
+
+---
+
 ## Where we stand
 
 The build is further along than "proof of concept" suggests. Done and solid:
@@ -135,7 +155,7 @@ Weekly cadence thereafter (the "fill in the lines weekly" rhythm):
 |---|---|---|
 | Tue | Lines land, week auto-opens | `sync-slate` hourly; verify `missing = 0` |
 | Thu 4 PM ET | Week locks, entries created | `lock-due-weeks` cron; spot-check |
-| Sun–Mon | Scores in, picks graded | see §3 — automate or enter by hand |
+| Sun–Mon | Scores in, picks graded | `sync-scores` every 5 min; manual fallback |
 | Tue | Team stats refresh, winner check | manual SQL per OPERATIONS.md |
 
 ---
@@ -156,17 +176,16 @@ or red while you watch — currently never happens:
 
 Both need fixing; neither is large:
 
-- [ ] **`sync-scores`** — a sibling Edge Function on the `sync-slate` pattern
-      (fetch → normalise → call a service-role-only SQL door; the
-      `sync_apply_week_lines` grant pattern is the template, and
-      `set_final_score` + `score_week` already exist and are idempotent). Two
-      candidate feeds: ESPN's public scoreboard JSON (updates live, unofficial
-      but ubiquitous) or nflverse (already trusted here for lines, but results
-      land after the games, not during). For live Sundays it has to be the
-      former, polled every ~10 minutes during game windows; nflverse can stay
-      as the Monday-night backstop. *Fallback if this slips past Week 1: the
-      operator enters scores Sunday evening per OPERATIONS.md — the game still
-      works, the magic is just delayed.*
+- [x] **`sync-scores`** — built 2026-08-27, on the `sync-slate` pattern. ESPN's
+      live scoreboard behind a swappable provider; migration 0017's
+      `apply_week_scores` writes live and final scores (a final is final — the
+      feed never rewrites one) and grades in the same call, so a card flips
+      within one client poll of a game ending. In-progress scores now show on
+      My Week. **Still needs the operator**: apply migration 0017, run
+      `supabase/tests/scores.sql`, `supabase functions deploy sync-scores`,
+      schedule the `*/5` cron, and watch its first game day by hand (the feed
+      shape is observed, not documented) — all per OPERATIONS.md. Manual score
+      entry stays as the fallback and correction path.
 - [x] **Client auto-refresh** — done 2026-08-27. Refetch on `visibilitychange`,
       plus a poll whose cadence follows what is in motion (`lib/refresh.ts`):
       60s with games in flight, 5 min while waiting on lines / the lock / the
@@ -271,7 +290,7 @@ Held per the no-feature-bloat principle; revisit only when reality demands:
 | 3 | Schedule the three jobs + deploy sync-slate (§2) | S | This week |
 | 4 | Privacy page, prize decision, OG tags, URL config (§4) | S each | This week |
 | 5 | ~~Client auto-refresh (§3)~~ | S | Done 2026-08-27 |
-| 6 | `sync-scores` (§3) | M | Before Sep 13, manual fallback exists |
+| 6 | ~~`sync-scores` (§3)~~ | M | Built 2026-08-27; operator: apply 0017, deploy, schedule |
 | 7 | Demo cutover + Week 1 lines + invite copy (§2) | S | Sep 8–9 |
 | 8 | Nudge email, ~~season board~~ (done), lines-open email (§5) | M | Weeks 1–3 |
 
