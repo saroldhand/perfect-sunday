@@ -116,8 +116,14 @@ export default function MyWeek() {
                   : undefined
               }
               score={
-                game.status === "final"
-                  ? { home: game.home_score, away: game.away_score }
+                // in_progress carries the live score sync-scores is writing;
+                // scheduled has nothing to show but the kickoff time.
+                game.status !== "scheduled"
+                  ? {
+                      home: game.home_score,
+                      away: game.away_score,
+                      final: game.status === "final",
+                    }
                   : undefined
               }
             />

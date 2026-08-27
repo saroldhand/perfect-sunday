@@ -5,8 +5,11 @@ automated instead — `sync-slate` opens a week once its lines land, and `pg_cro
 can run the lock and grade jobs — but **nothing is scheduled by default**, so
 until you switch it on, the steps below are how a week runs.
 
-Entering final scores is the one part still manual everywhere: `sync-slate`
-fetches lines, not results.
+Entering final scores is no longer the manual exception: `sync-scores`
+fetches results live and grades as games finish — see [sync-scores: pulling
+the results](#sync-scores-pulling-the-results). Typing box scores (step 3)
+remains as the fallback, and as the only path for a correction or a
+postponed game.
 
 Every function below lives in the `private` schema, which PostgREST does not
 expose. There is no REST endpoint for them, so a signed-in user cannot reach
@@ -173,6 +176,12 @@ and was not, fix their picks and re-run `lock_week` — it is safe to repeat.
 
 ## 3. Enter scores and grade
 
+`sync-scores` does this automatically as games finish — see [sync-scores:
+pulling the results](#sync-scores-pulling-the-results). This is the manual
+fallback, for a correction, a postponed game, or when the feed is short.
+`set_final_score` has no final-is-final guard, which is deliberate: it is how
+the operator overrules a number, including one the feed already wrote.
+
 One call per finished game, then one call to grade. `set_final_score` takes the
 `external_id` from the slate rather than the row uuid, so scores can be typed
 from a box score.
@@ -334,6 +343,91 @@ This needs `pg_net` as well as `pg_cron`. Unschedule with
 - Write a partial line. A game missing any of spread, total, over odds or under
   odds is skipped entirely, leaving the column NULL so the week stays shut.
 
+## sync-scores: pulling the results
+
+`supabase/functions/sync-scores` fetches the locked week's scores and grades
+whatever has gone final, in the same call. It is what makes a pick flip green
+within a minute or two of a game ending — any day the schedule puts a game on
+— instead of waiting for box scores to be typed in.
+
+**Where the scores come from.** ESPN's public scoreboard feed, the one their
+own site runs on. It updates live, which nflverse (the lines source) does not
+— its CSV publishes on a lag of hours, useless for the Sunday sweat. The feed
+is unofficial-but-ubiquitous rather than documented, so every assumption
+about its shape is pinned in `src/lib/scoresProvider.test.ts`, and the
+function reports `fetched` beside `updated` so a shape drift shows as a
+visible gap, never a silent miss. Swapping providers is one new
+`ScoresProvider` in `supabase/functions/_shared/scoresProvider.ts`, exactly
+as on the odds side.
+
+What one run does, all through `private.apply_week_scores` (0017, covered by
+[tests/scores.sql](tests/scores.sql)):
+
+- writes live scores to games in progress — My Week shows them as they move;
+- marks finished games `final` with their box score;
+- grades everything standing final through the same idempotent `score_week`
+  the cron backstop uses, so entries move in the same call;
+- flips the week to `scored` when the last game is in.
+
+### Deploying and running it
+
+```bash
+supabase functions deploy sync-scores
+```
+
+Run it by hand:
+
+```bash
+# the earliest locked week with a started slate and an unfinished game
+curl -X POST "https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-scores" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY"
+
+# or a specific week
+curl -X POST "https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-scores" \
+  -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+  -H "content-type: application/json" -d '{"weekId": 12}'
+```
+
+**Watch its first game day by hand.** The feed's shape is observed, not
+promised. During the first live window, run it once and read the report:
+`fetched` should match the number of games under way or final, and `updated`
+should track it. A `fetched` of 16 against an `updated` of 0 means the feed
+moved and the parser's fixtures need updating — either way nothing wrong has
+landed in the database, because a row the parser cannot read is skipped, not
+guessed at.
+
+### Scheduling it
+
+Every five minutes, year-round. When no locked week has a started, unfinished
+game it answers `nothing-to-do` from one indexed query without fetching
+anything — so the idle cost is nothing, and there is no game-window calendar
+to maintain or get wrong on a Thursday, a Saturday, or Christmas morning.
+
+```sql
+select cron.schedule('sync-scores', '*/5 * * * *', $$
+  select net.http_post(
+    url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-scores',
+    headers := '{"Content-Type":"application/json"}'::jsonb
+  );
+$$);
+```
+
+Same requirements as sync-slate: `pg_cron` and `pg_net`. Keep
+`score-due-weeks` scheduled as well — grading rides inside
+`apply_week_scores`, but the 0014 sweep is the backstop if a run ever dies
+between the write and the grade.
+
+### What it will not do
+
+- Touch a week that is not `locked`. An open week's games have not started,
+  and a scored week's results are published — a feed never rewrites them.
+- Rewrite a game already marked `final`. Its grades may be on someone's
+  screen; a stat correction that flips them is the operator's deliberate
+  call, through `set_final_score` in step 3, never a feed hiccup's.
+- Write a postponed or abandoned game. The feed reports both as ended without
+  completion; they are left untouched, and what the game counts as is the
+  operator's decision.
+
 ## Putting steps 2 and 3 on a timer
 
 Migration 0014 adds two wrappers that pick their own weeks, so they can be run
@@ -360,8 +454,8 @@ it. An Edge Function would add an HTTP hop, a service-role key sitting in a
 function secret, and a deploy step, all to reach a function already living in
 the database `pg_cron` runs in.
 
-Only `sync-slate` needs to be an Edge Function, and it is not built yet — it
-waits on the aggregator decision in SPEC's open decisions.
+Only the two fetchers — `sync-slate` for lines and `sync-scores` for results
+— need to be Edge Functions, and both exist.
 
 ### Switching it on
 
@@ -399,9 +493,10 @@ select cron.unschedule('lock-due-weeks');
 select cron.unschedule('score-due-weeks');
 ```
 
-Entering final scores stays manual until `sync-slate` exists: `score_due_weeks`
-grades whatever `set_final_score` has marked final, and nothing yet marks games
-final on its own.
+`score_due_weeks` grades whatever stands final, however it got there. With
+`sync-scores` scheduled, games mark themselves final and grading rides in the
+same call — this sweep stays on as the backstop, and as the path for scores
+entered by hand.
 
 ## Resetting the demo
 
