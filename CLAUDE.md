@@ -2,6 +2,7 @@
 
 Free-to-play NFL pick'em. Full product spec: [docs/SPEC.md](docs/SPEC.md).
 Hosting and Phase 1 decisions: [docs/superpowers/specs/2026-08-21-github-pages-deployment-design.md](docs/superpowers/specs/2026-08-21-github-pages-deployment-design.md).
+Pre-launch to-do and priorities: [docs/TODO.md](docs/TODO.md).
 
 ## Supabase — hard boundary
 
