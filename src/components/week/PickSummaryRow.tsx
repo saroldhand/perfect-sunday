@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { accentColor } from "@/lib/teamColor";
 import { lineFor, formatKickoff, formatTotal } from "@/lib/format";
 import type { Pick } from "@/lib/picks";
@@ -122,6 +123,19 @@ function PickChip({
 }) {
   const graded = chosen && grade !== undefined && grade !== null;
 
+  // A chip that resolves while it is on screen gets one brief pulse — the
+  // signature moment the live refresh exists to deliver. It is keyed off the
+  // ungraded→graded *transition*, not the graded state: a list opened Monday
+  // morning is already fully graded and must stay still. Render-time state
+  // adjustment rather than an effect, same pattern (and lint rule) as
+  // WeekProvider's identity reset.
+  const [wasGraded, setWasGraded] = useState(graded);
+  const [resolved, setResolved] = useState(false);
+  if (graded !== wasGraded) {
+    setWasGraded(graded);
+    if (graded) setResolved(true);
+  }
+
   const shell = !chosen
     ? "pick-chip-empty"
     : graded
@@ -140,7 +154,9 @@ function PickChip({
 
   return (
     <span
-      className={`pick-chip min-w-0 flex-1 justify-center ${shell}`}
+      className={`pick-chip min-w-0 flex-1 justify-center ${shell} ${
+        resolved ? "pick-chip-resolve" : ""
+      }`}
       aria-label={graded ? `${label}, ${grade ? "correct" : "wrong"}` : undefined}
     >
       <span
