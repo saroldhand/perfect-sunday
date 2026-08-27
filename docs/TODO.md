@@ -12,6 +12,26 @@ three waits.
 
 ---
 
+## ⚠ Do next — operator, high priority
+
+**Switch on `sync-scores`.** The code merged 2026-08-27, but it is inert until
+these run — and without them nothing marks games final, so no pick grades on
+game day. All dashboard/CLI steps only the operator can do; the repo side is
+finished. Details for each live in
+[supabase/OPERATIONS.md](../supabase/OPERATIONS.md).
+
+1. [ ] Apply migration `0017_sync_scores.sql` in the Supabase SQL editor.
+2. [ ] Run [supabase/tests/scores.sql](../supabase/tests/scores.sql) there —
+       expect 21 of 21 PASS.
+3. [ ] `supabase functions deploy sync-scores`
+4. [ ] Schedule it — the `*/5 * * * *` `cron.schedule` snippet in
+       OPERATIONS.md (needs `pg_cron` and `pg_net` enabled).
+5. [ ] On its first game day, run it once by hand and check `fetched` against
+       `updated` in the report — the feed's shape is observed, not documented,
+       and this is the check that proves it.
+
+---
+
 ## Where we stand
 
 The build is further along than "proof of concept" suggests. Done and solid:
