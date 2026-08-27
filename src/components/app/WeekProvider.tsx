@@ -1,7 +1,15 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { useSession } from "@/hooks/useSession";
+import { IDLE_POLL_MS, pollDelay } from "@/lib/refresh";
 import { getProfile, type Profile } from "@/lib/profile";
 import {
   getCurrentWeek,
@@ -68,6 +76,9 @@ export function WeekProvider({ children }: { children: React.ReactNode }) {
   const userId = session.status === "signed-in" ? session.session.user.id : null;
   const [value, setValue] = useState<WeekContextValue>(EMPTY);
   const [nonce, setNonce] = useState(0);
+  // When the last load finished, so the visibility handler can tell a real
+  // return to the app from a quick flick between tabs.
+  const loadedAt = useRef(0);
 
   const refresh = useCallback(() => setNonce((n) => n + 1), []);
 
@@ -126,6 +137,7 @@ export function WeekProvider({ children }: { children: React.ReactNode }) {
       const boardEntries = boardWeek ? await getEntries(boardWeek.id) : [];
       if (!active) return;
 
+      loadedAt.current = Date.now();
       setValue({
         phase: "ready",
         error: null,
@@ -142,6 +154,7 @@ export function WeekProvider({ children }: { children: React.ReactNode }) {
       });
     })().catch((err: unknown) => {
       if (!active) return;
+      loadedAt.current = Date.now();
       setValue({
         ...EMPTY,
         phase: "error",
@@ -158,6 +171,41 @@ export function WeekProvider({ children }: { children: React.ReactNode }) {
       active = false;
     };
   }, [session, nonce, refresh, userId]);
+
+  // Both re-pull paths below go through refresh(), which keeps the old data
+  // on screen until the new load lands — phase only resets when the identity
+  // changes — so neither ever flashes a skeleton.
+
+  // Returning to the tab is the moment most likely to have missed something:
+  // a phone unlocked during the 4:25 window, a tab left open since Thursday.
+  // The threshold keeps a quick flick between apps from double-loading.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      if (Date.now() - loadedAt.current < 15_000) return;
+      refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refresh]);
+
+  // While the tab stays open and visible, poll on the cadence of what is
+  // actually in motion — see pollDelay. A failed load also retries on the
+  // idle tick, so a transient network error recovers on its own instead of
+  // dead-ending on the error screen. Depending on `value` re-arms this after
+  // every load, which is what keeps the clock-dependent decision fresh: the
+  // idle tick that crosses a kickoff comes back and re-arms itself fast.
+  useEffect(() => {
+    const delay =
+      value.phase === "error"
+        ? IDLE_POLL_MS
+        : pollDelay(value.week, value.games, Date.now());
+    if (delay === null) return;
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") refresh();
+    }, delay);
+    return () => clearInterval(id);
+  }, [value, refresh]);
 
   return <WeekContext.Provider value={value}>{children}</WeekContext.Provider>;
 }

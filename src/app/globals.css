@@ -256,6 +256,12 @@ body {
     border-color: color-mix(in srgb, var(--color-wrong) 55%, transparent);
     background: color-mix(in srgb, var(--color-wrong) 14%, transparent);
   }
+  /* A pick resolving while the user watches: one brief pulse as it flips to
+     green or red, then stillness — SPEC §8's signature moment. Applied only on
+     the ungraded→graded transition; the global reduced-motion rule covers it. */
+  .pick-chip-resolve {
+    animation: resolve 500ms cubic-bezier(0.16, 1, 0.3, 1);
+  }
 }
 
 @keyframes ticker-scroll {
@@ -287,6 +293,18 @@ body {
   }
   40% {
     transform: scale(1.04);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes resolve {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.08);
   }
   100% {
     transform: scale(1);

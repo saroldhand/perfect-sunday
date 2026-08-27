@@ -167,12 +167,12 @@ Both need fixing; neither is large:
       as the Monday-night backstop. *Fallback if this slips past Week 1: the
       operator enters scores Sunday evening per OPERATIONS.md — the game still
       works, the magic is just delayed.*
-- [ ] **Client auto-refresh** — no Realtime infrastructure needed. Refetch on
-      `visibilitychange` (the common case: phone unlocked during a commercial
-      break) plus a ~60-second poll while the week is `locked` and any game is
-      in flight. `WeekProvider.refresh()` already exists; this is wiring, not
-      architecture. Grades landing should reuse the existing correct/wrong
-      pulse so the moment actually lands.
+- [x] **Client auto-refresh** — done 2026-08-27. Refetch on `visibilitychange`,
+      plus a poll whose cadence follows what is in motion (`lib/refresh.ts`):
+      60s with games in flight, 5 min while waiting on lines / the lock / the
+      scoring sweep, none once scored. A failed load retries on the idle tick.
+      A pick resolving on screen now pulses once as it flips green or red —
+      the moment §8 of the SPEC calls the signature.
 
 ---
 
@@ -211,12 +211,12 @@ Ranked by retention-per-effort; none block the first share.
    and a lost habit. Needs §1's email infrastructure (another reason it's
    first); then it's a pg_cron query + provider send. Respect the obvious
    opt-out.
-2. **Season leaderboard.** Entries accumulate but nothing sums them — the
-   schema's `season_standings` view was never built, and the board shows one
-   week at a time. The season table is the product's own answer to busting
-   ("still 4th overall") and it's what makes Week 8 matter to someone who
-   busted in Week 1. A second tab on the board, powered by a view over
-   `entries`. Wants to exist by Week 2–3, not day 1.
+2. ~~**Season leaderboard.**~~ **Built 2026-08-27** — a Season tab on the
+   board, summing every scored week per player with the SPEC §4 tiebreak
+   (weeks played). No `season_standings` view after all: entries are already
+   publicly readable and a season is a few hundred rows, so the aggregation
+   is client-side in `lib/season.ts`, tested without a database. The view can
+   exist later if scale ever says otherwise.
 3. **"Lines are open" moment.** The Tuesday open currently happens silently.
    Cheapest version: the same email plumbing as the nudge. This is the
    top-of-week habit hook.
@@ -270,9 +270,9 @@ Held per the no-feature-bloat principle; revisit only when reality demands:
 | 2 | Code-entry sign-in (§1) | S–M | This week |
 | 3 | Schedule the three jobs + deploy sync-slate (§2) | S | This week |
 | 4 | Privacy page, prize decision, OG tags, URL config (§4) | S each | This week |
-| 5 | Client auto-refresh (§3) | S | Before Sep 9 |
+| 5 | ~~Client auto-refresh (§3)~~ | S | Done 2026-08-27 |
 | 6 | `sync-scores` (§3) | M | Before Sep 13, manual fallback exists |
 | 7 | Demo cutover + Week 1 lines + invite copy (§2) | S | Sep 8–9 |
-| 8 | Nudge email, season board, lines-open email (§5) | M | Weeks 1–3 |
+| 8 | Nudge email, ~~season board~~ (done), lines-open email (§5) | M | Weeks 1–3 |
 
 Sizes: S ≤ half a day, M = a day or two.
