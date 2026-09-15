@@ -1,7 +1,13 @@
 import { supabase } from "@/lib/supabase/client";
 import { selectCurrentWeek } from "@/lib/schedule";
 
-export type WeekStatus = "upcoming" | "open" | "locked" | "scored";
+/**
+ * `previous` is a terminal status for a week that came and went without being
+ * played — 2026 Week 1, whose lines never landed because the project was
+ * paused across the opener. See migration 0018. It is never the week the app
+ * shows: selectCurrentWeek refuses to return one.
+ */
+export type WeekStatus = "upcoming" | "open" | "locked" | "scored" | "previous";
 
 export type Week = {
   id: number;

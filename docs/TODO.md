@@ -31,13 +31,18 @@ and §4 below. Full runbook and findings:
        not exist as rows, which is the real reason Week 1 never happened.
 2. [x] Migrations 0013-0017 applied and verified. 0015's 272 games were
        digest-checked against the repo file rather than eyeballed.
-3. [x] **Demo week decided** — set to `upcoming`, keeping all **49 picks from
-       4 real accounts**. Deleting it would have destroyed the only real usage
-       data the product has. It is now inert in every job and off the live app,
-       and the board stays clean. A **Previous tab** was added in the same
-       change so those picks have somewhere to be seen.
-4. [x] Week 1 left `upcoming`. Confirmed inert against the live database:
-       `next_week_needing_lines()` returns Week 2, skipping it unprompted.
+3. [x] **Demo week deleted** (2025 Week 18). Cascade counted: weeks 19 → 18,
+       games 288 → 272, picks 49 → 0. The four accounts survive; only their
+       demo picks are gone. A CSV of all 49 picks was exported first and handed
+       to the operator, deliberately not committed — real display names, public
+       repo. Consequence: Previous reads "Nothing to look back on yet" for
+       everyone until Week 2 finishes.
+4. [x] **Week 1 is `previous`** — a fifth `week_status` added by migration
+       0018, because a week that came and went unplayed is not `upcoming` and
+       is not `scored`. No scheduled job needed changing (each selects on the
+       status its own work moves a week out of), but the app did: `hubView`
+       would have rendered a result screen for it, and My Week and the deck
+       would have rendered it as Open. Both fixed, four tests added.
 5. [x] Both functions deployed and invoked against production. `sync-slate`
        reported `fetched: 16, updated: 16, missing: 0, opened: true` — **Week 2
        is open and taking picks**, and the spread sign was verified against the

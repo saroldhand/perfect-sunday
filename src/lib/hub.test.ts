@@ -70,6 +70,13 @@ describe("hubView", () => {
     expect(view).toEqual({ kind: "upcoming", week: week("upcoming") });
   });
 
+  it("shows nothing for a week that was never played", () => {
+    // Without an explicit guard this falls through the open/locked chain into
+    // the `scored` branch and invents a result — "0 of 32 correct" for a week
+    // nobody was ever able to pick.
+    expect(hubView(input({ week: week("previous") })).kind).toBe("no-week");
+  });
+
   it("reports progress while the week is open", () => {
     const view = hubView(input({ week: week("open"), totalGames: 16, completed: 4, entry: null }));
     expect(view).toEqual({

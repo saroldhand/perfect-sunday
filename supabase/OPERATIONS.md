@@ -136,23 +136,40 @@ order by w.week_number;
 
 Open the week only when `missing` is 0. Step 1 below is that step.
 
-### Cutting over from the demo week
+### The demo week is gone
 
-The 2025 Week 18 demo week is still in the database and still `open`, and an
-open week wins over every upcoming one — so until it is closed, the app shows
-the demo rather than the real season. Before Week 1:
+The 2025 Week 18 demo week was deleted on 2026-09-15. Nothing in this document
+needs it any more, and the cutover instructions that used to sit here — mark it
+`scored`, or delete it — are retired along with it. If a demo week is ever
+seeded again (migration 0005), delete it rather than marking it `scored`:
+`getLastScoredWeek` orders by season descending, so a scored week from an old
+season becomes the board's "most recent finished week" until a real one is
+scored.
+
+### `previous`: a week that was never played
+
+Migration 0018 adds a fifth `week_status`. It exists for 2026 Week 1, which
+went by while the project was paused — no lines, no picks, nothing graded — and
+for which none of the other four statuses was true. `upcoming` was the least
+wrong option and was used for a few hours; it is still a lie about a week in
+the past.
 
 ```sql
-update public.weeks set status = 'scored'
-where season = 2025 and week_number = 18;
+update public.weeks set status = 'previous'
+where season = 2026 and week_number = 1;
 ```
 
-`scored` rather than deleted keeps the demo picks and entries as history and
-keeps the leaderboard's "last scored week" fallback with something to show. To
-remove it outright instead, `delete from public.weeks where season = 2025 and
-week_number = 18;` cascades to its games, picks and entries.
+It is terminal: an operator puts a week there, and nothing takes it out. No
+scheduled job can see it, because each selects on the status its own work
+moves a week out of — so there was nothing to change in any of them. The app
+skips it too: `selectCurrentWeek` will not return a `previous` week, which is
+what stops an empty slate reaching the screen.
 
-## 1. Open the week
+Use it for a week that is over and was not played. Do **not** use it to retire
+a week that *was* played — that is what `scored` is for, and a played week's
+result belongs on the board.
+
+## 1. Open the week## 1. Open the week
 
 Picks are writable only while `weeks.status = 'open'` — that is enforced by RLS,
 not by the UI.

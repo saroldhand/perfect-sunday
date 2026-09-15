@@ -60,6 +60,12 @@ export function hubView(input: HubInput): HubView {
 
   if (!week) return { kind: "no-week" };
 
+  // A `previous` week is over and was never played. selectCurrentWeek does not
+  // hand one over, so this is a belt — but it has to be here, because the
+  // chain below ends in an unguarded `scored` branch: without this, a week
+  // nobody could pick would render a result screen reading "0 of 32 correct".
+  if (week.status === "previous") return { kind: "no-week" };
+
   // An open week with no slate is upcoming: there is nothing to pick yet.
   // Deliberately NOT applied to locked or scored — a finished week with no
   // games rows is a database inconsistency, and hiding it behind "lines drop

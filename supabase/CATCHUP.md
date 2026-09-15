@@ -134,74 +134,62 @@ once, in the SQL editor:
 [tests/scores.sql](tests/scores.sql) (expect 21 of 21 PASS),
 [tests/lines.sql](tests/lines.sql), [tests/jobs.sql](tests/jobs.sql).
 
-## Step 2 — the demo week — DONE, kept rather than deleted
+## Step 2 — the demo week — DONE, deleted
 
-**Settled 2026-09-15: `status = 'upcoming'`.** The operator's call, and the
-right one — the week held **49 picks from 4 real accounts** (complete 16-of-16
-sets for `Harry S`, `Baller` and `max`; `EK` picked one game), so deleting it,
-which is what this runbook first recommended, would have destroyed the only
-real usage data the product has.
+**Settled 2026-09-15: deleted.** It was first parked at `upcoming` to keep its
+49 picks, then removed outright at the operator's instruction. The cascade was
+counted rather than assumed: weeks 19 → 18, games 288 → 272, picks 49 → 0,
+entries 0 throughout. The four `profiles` rows survive — the accounts are
+intact, only their demo picks are gone.
 
-```sql
-update public.weeks set status = 'upcoming'
-where season = 2025 and week_number = 18;
-```
+A CSV of the week (16 games, all 49 picks with their timestamps, per-player
+counts reconciled against production) was exported immediately before the
+delete and handed to the operator. It is deliberately **not** committed: the
+rows carry real display names and this repo is public.
 
-What that buys, all verified against production:
+One consequence worth stating plainly, because it undercuts the reason the
+Previous tab was built: those were the only picks in the database, so Previous
+now reads "Nothing to look back on yet" for everyone until Week 2 finishes.
+That is correct behaviour, not a regression.
 
-- The picks are intact — 49, unchanged.
-- It is inert everywhere. Every job filters on status or on `locks_at > now()`,
-  so `lock_due_weeks` will not lock it once cron is on, `sync-slate` will not
-  refill it, and `sync-scores` will not fetch it. Same state Week 1 sits in.
-- It is off the live app: `selectCurrentWeek` only considers `open` or
-  `locked` weeks first, then upcoming weeks whose lock is still ahead.
-- The board stays clean, which `scored` would not have — `getLastScoredWeek`
-  orders by season descending, so a scored 2025 week would have become the
-  board's "most recent finished week" with no entries behind it.
+## Step 3 — Week 1 — DONE, and it now says what it is
 
-The one cost of keeping it was that those 49 picks had nowhere to be seen, so
-the same change added a place: **a Previous tab** (`/history`), listing every
-week already gone by that you have picks in, newest first, with the same rows
-and grade chips My Week uses. It keys off the clock — `locks_at <= now` —
-rather than off `scored`, which is what lets it show this demo week at all,
-and what will stop it hiding a real week halfway through being graded.
+**`status = 'previous'`,** via migration
+[0018](migrations/0018_previous_week_status.sql), which adds that value to the
+`week_status` enum. Parking it at `upcoming` worked — every job filters on
+status or on `locks_at > now()`, so it was inert — but it was a lie about a
+week in the past, and both this file and OPERATIONS.md had to apologise for it
+twice. `previous` says the true thing: over, and never played.
 
-## Step 3 — leave Week 1 alone, deliberately
+It is a dead end by design. Nothing moves a week into it but an operator, and
+nothing moves one out. The four scheduled jobs each select on the status their
+own work moves a week out of, so none of them needed changing:
 
-Week 1 is over and nobody played it. Assuming Step 0 returned zeros, the
-correct action is **none**: leave it `upcoming` and let the season start at
-Week 2.
+| Job | Selects on | Sees a `previous` week? |
+|---|---|---|
+| `lock_due_weeks` | `status = 'open'` | no |
+| `score_due_weeks` | `status = 'locked'` | no |
+| `next_week_needing_lines` | `upcoming` and `locks_at > now()` | no |
+| `next_week_needing_scores` | `status = 'locked'` | no |
 
-It is inert where it sits, which is worth knowing rather than trusting:
+Confirmed live after the change: `next_week_needing_lines()` still returns
+Week 3 and `next_week_needing_scores()` still returns null.
 
-- `private.next_week_needing_lines()` filters on `locks_at > now()`, so
-  `sync-slate` will never select Week 1 again.
-- `private.lock_due_weeks()` only looks at `open` weeks, so it will never lock
-  it.
-- `private.next_week_needing_scores()` only looks at `locked` weeks, so
-  `sync-scores` will never fetch it.
-- `selectCurrentWeek` skips it: rule 2 requires `locks_at > now()`.
-- The season table counts `scored` weeks only, so it contributes nothing.
+**The app needed more care than the database.** A fifth enum value falls
+through `if` chains written when there were four, and two of those
+fall-throughs were real bugs rather than cosmetic:
 
-**Do not backfill it.** Writing Week 1's closing lines in now and grading
-against them would be the exact failure OPERATIONS.md singles out as the worst
-this product has — grading people against a line they were never shown — with
-the added absurdity that there are no picks to grade. If tidiness itches, the
-honest marker is a status the schema does not have; `upcoming` in the past is
-the least wrong of the options available.
+- `hubView` ended in an unguarded `scored` branch, so a `previous` week
+  rendered a **result screen** — "0 of 32 correct" for a week nobody could
+  pick. Proven by removing the new guard and watching the test report
+  `expected 'scored' to be 'no-week'`.
+- My Week and the pick deck keyed their "nothing to show" state on `upcoming`
+  alone, so a `previous` week rendered as **Open**, with a lock time already
+  in the past and an invitation to pick.
 
-One guardrail while it sits there: **never pass Week 1's id to `sync-slate`
-by hand.** `apply_week_lines` has no clock guard of its own — only the week
-selector does — so an explicit `{"weekId": <week 1>}` would fill its lines and
-flip a finished week to `open`, with picks writable on games already played.
-Let the function choose the week.
-
-*If Step 0 showed Week 1 picks after all* (someone played before the pause),
-stop and decide deliberately. The path is then the ordinary one — lines are
-already in if they picked against them, so `private.lock_week(...)` then
-`sync-scores` or manual `set_final_score` per OPERATIONS.md steps 2–3 — but
-whether to run a week whose games finished before it was ever locked is a call
-about the contest's integrity, not a SQL step.
+Both are guarded, and `selectCurrentWeek` now refuses to return a `previous`
+week at all — so those guards are belts, and the braces are that the UI never
+receives one. Four tests cover it.
 
 ## Step 4 — Week 2 is open — DONE
 
@@ -279,9 +267,10 @@ Two checks that only the first live run can settle:
 - [x] Step 0 probes run, output read
 - [x] Migrations applied — 0013, 0014, 0015, 0016, 0017; 0015 digest-verified
 - [ ] `tests/scores.sql` run in the SQL editor (21 of 21 PASS)
-- [x] **Demo week decided** (Step 2) — set to `upcoming`; 49 picks kept, and
-      a Previous tab added so they can be looked at
-- [x] Week 1 confirmed pick-free and left `upcoming`; live functions skip it
+- [x] **Demo week deleted** (Step 2) — cascade counted; CSV backup handed to
+      the operator, deliberately not committed
+- [x] Week 1 set to `previous` (migration 0018), with the two app
+      fall-throughs that a fifth enum value exposed fixed and tested
 - [x] `sync-slate` and `sync-scores` deployed, and each invoked successfully
 - [x] Week 2 lines in, `missing: 0`, week `open`, spread sign verified
 - [x] `pg_cron` + `pg_net` installed; `lock-due-weeks`, `score-due-weeks` and

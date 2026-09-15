@@ -224,10 +224,14 @@ function WeekCard({
 }
 
 /**
- * A past week's status, said plainly. `upcoming` reaches this screen only for
- * a week whose lock time passed without it ever opening — the 2025 demo week
- * is exactly that — and calling it "Not played" is the honest reading: there
- * was never a locked slate to be graded against.
+ * A past week's status, said plainly.
+ *
+ * `previous` is the status for a week that went by without being played, and
+ * it only reaches this screen if the user somehow has picks in one — which
+ * 2026 Week 1, the week that status exists for, does not. `upcoming` reaching
+ * here would mean a week whose lock passed before it ever opened. Both read
+ * as "Not played", which is the honest answer: there was never a locked slate
+ * to grade against.
  */
 function label(status: HistoryWeek["week"]["status"]): string {
   switch (status) {
@@ -237,7 +241,8 @@ function label(status: HistoryWeek["week"]["status"]): string {
       return "Grading";
     case "open":
       return "Open";
-    default:
+    case "previous":
+    case "upcoming":
       return "Not played";
   }
 }
