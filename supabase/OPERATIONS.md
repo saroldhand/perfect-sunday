@@ -1,11 +1,25 @@
 # Running a week by hand
 
-> **2026-09-15 — the database is behind the repo.** The project was paused
-> across the Week 1 opener, so nothing here has been run against production
-> yet. Work [CATCHUP.md](CATCHUP.md) first; it is the one-time runbook that
-> gets the database to a live Week 2. One correction it carries: the demo-week
-> cutover below says mark it `scored`, which was right before the season
-> started and is wrong now — delete it instead, and CATCHUP.md Step 2 says why.
+> **2026-09-15 — the database and the repo are in step.** The catch-up in
+> [CATCHUP.md](CATCHUP.md) is done (it stays as the record of what was wrong),
+> migrations 0001-0019 are applied, and **2026 Week 2 is open on the
+> total + moneyline format**, locking Thursday 17 September 4:00 PM ET.
+>
+> Two things to carry forward from 0019, which replaced the spread layer with a
+> moneyline layer:
+>
+> 1. **Deploy order inverts for a breaking migration.** Rule 1 below says apply
+>    the migration before merging, which is right for an additive one — the old
+>    build simply does not know about a new nullable column. 0019 dropped a
+>    column the live build was selecting, so it was breaking in *both*
+>    directions. The order that minimises the window is: merge, wait for the
+>    Pages deploy to go green, then apply the migration immediately. Applying
+>    first would have blanked the site for the length of a CI run.
+> 2. **An open week can be reverted to `upcoming` safely**, and 0019 does it
+>    rather than leaving an open week whose slate it had just made incomplete.
+>    The week then re-opens through the normal path — `sync-slate` fills the
+>    prices, `apply_week_lines` opens it only when nothing is missing. Never
+>    force a week `open` by hand to undo this.
 
 The operator runs three steps from the Supabase SQL editor. All three can now be
 automated instead — `sync-slate` opens a week once its lines land, and `pg_cron`
