@@ -61,10 +61,25 @@ and §4 below. Full runbook and findings:
        where SPEC §2 put them before 0007 quietly moved the product onto the
        one format that section rejects. `games.spread` is dropped and replaced
        by `moneyline_home`/`moneyline_away`; `picks.spread_pick` is renamed.
-       Two things worth knowing: the rules page changed, so `TERMS_VERSION`
-       bumped and all four accounts are re-prompted to accept; and 0019 fixes a
-       latent bug in 0006's moneyline grading, where a tied game credited a
-       pick nobody had made.
+       Applied to production and live: merged, Pages deploy green, 0019
+       applied, `sync-slate` redeployed and run — `fetched: 16, updated: 16,
+       missing: 0, opened: true`, so **Week 2 is open again on the new
+       format**. Three things worth knowing: `TERMS_VERSION` bumped because
+       the rules changed, so all four accounts are re-prompted to accept;
+       0019 fixes a latent bug in 0006's moneyline grading, where a tied game
+       credited a pick nobody had made; and the 16 Week 2 spread picks that
+       existed at the time were cleared, with a CSV of them handed to the
+       operator first (the over/unders survived).
+9. [ ] **Re-pick Week 2's 16 moneylines.** The over/unders are still saved;
+       the deck will show 16 games needing their second pick. Nothing is
+       scored without a complete set, so an entry only exists after Thursday's
+       lock if those 16 go in.
+10. [ ] **Run `supabase/tests/lines.sql`** against the project. It was
+       rewritten for the moneyline payload and its 20 assertions have not been
+       run — the connector dropped before they could be. `scoring.sql`'s 13
+       were run and passed. The three new one-sided-price cases are the ones
+       to watch: they are the only coverage of the term the completeness rule
+       grew in 0019.
 
 ---
 
