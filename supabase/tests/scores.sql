@@ -24,16 +24,16 @@ values
   (972, 2098, 6, now() + interval '1 day',  'open');    -- open: closed to the scores feed
 
 insert into public.games (id, week_id, external_id, away_team, home_team, kickoff_at,
-                          spread, total, over_odds, under_odds, line_source)
+                          moneyline_home, moneyline_away, total, over_odds, under_odds, line_source)
 values
   ('cccc0004-0000-4000-8000-000000000001', 970, '2098-04-LV-KC',
-   'LV', 'KC', now() - interval '3 hours', -3.5, 44.5, -110, -110, 'test'),
+   'LV', 'KC', now() - interval '3 hours', -180, 155, 44.5, -110, -110, 'test'),
   ('cccc0004-0000-4000-8000-000000000002', 970, '2098-04-CHI-GB',
-   'CHI', 'GB', now() - interval '3 hours', 2.5, 41.0, -105, -115, 'test'),
+   'CHI', 'GB', now() - interval '3 hours', 120, -140, 41.0, -105, -115, 'test'),
   ('cccc0004-0000-4000-8000-000000000003', 971, '2098-05-NYJ-BUF',
-   'NYJ', 'BUF', now() + interval '2 days', -9.5, 38.5, -110, -110, 'test'),
+   'NYJ', 'BUF', now() + interval '2 days', -450, 340, 38.5, -110, -110, 'test'),
   ('cccc0004-0000-4000-8000-000000000004', 972, '2098-06-SF-SEA',
-   'SF', 'SEA', now() - interval '1 hour', -3.5, 44.5, -110, -110, 'test');
+   'SF', 'SEA', now() - interval '1 hour', -180, 155, 44.5, -110, -110, 'test');
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
 values
@@ -44,7 +44,7 @@ insert into public.profiles (id, display_name) values
 
 -- A complete set on week 970: OVER + KC on G1, UNDER + GB on G2. With the
 -- finals applied below, all four picks come out correct.
-insert into public.picks (user_id, game_id, total_pick, spread_pick) values
+insert into public.picks (user_id, game_id, total_pick, moneyline_pick) values
   ('aaaa0004-0000-4000-8000-000000000001','cccc0004-0000-4000-8000-000000000001','OVER','KC'),
   ('aaaa0004-0000-4000-8000-000000000001','cccc0004-0000-4000-8000-000000000002','UNDER','GB');
 
@@ -89,7 +89,7 @@ from public.picks where game_id='cccc0004-0000-4000-8000-000000000001';
 
 -- ------------------------------------------------------ the first final ----
 
--- KC 30, LV 20: combined 50 beats 44.5 (OVER correct) and 30-3.5 beats 20
+-- KC 30, LV 20: combined 50 beats 44.5 (OVER correct) and KC won outright
 -- (KC covers). Both of this user's picks on the game are right.
 insert into applied select 'final-1', * from private.apply_week_scores(970, '[
   {"externalId":"2098-04-LV-KC","homeScore":30,"awayScore":20,"status":"final"}
@@ -103,7 +103,7 @@ insert into results select 'a partial slate does not score the week','false',
 
 -- The assertion sync-scores exists for: the grade is already there.
 insert into results select 'the same call graded the pick','true/true',
-  total_correct::text||'/'||spread_correct::text, total_correct and spread_correct
+  total_correct::text||'/'||moneyline_correct::text, total_correct and moneyline_correct
 from public.picks where game_id='cccc0004-0000-4000-8000-000000000001';
 insert into results select 'the entry moved in the same call','2',
   correct_count::text, correct_count=2

@@ -62,12 +62,12 @@ export function PickDeck({ userId, week, games, teams, initialPicks }: Props) {
     [games.length],
   );
 
-  function handlePick(game: Game, kind: "total" | "spread", value: string) {
+  function handlePick(game: Game, kind: "total" | "moneyline", value: string) {
     const before = picks[game.id];
     const wasComplete = isGameComplete(before);
     const next: Pick = {
       total: kind === "total" ? (value as TotalSide) : (before?.total ?? null),
-      spread: kind === "spread" ? value : (before?.spread ?? null),
+      moneyline: kind === "moneyline" ? value : (before?.moneyline ?? null),
     };
 
     // Optimistic: the tap must feel instant, and a failed write is recoverable
@@ -78,7 +78,9 @@ export function PickDeck({ userId, week, games, teams, initialPicks }: Props) {
     savePick(
       userId,
       game.id,
-      kind === "total" ? { total_pick: value as TotalSide } : { spread_pick: value },
+      kind === "total"
+        ? { total_pick: value as TotalSide }
+        : { moneyline_pick: value },
     ).catch((err: unknown) => {
       setSaveError(err instanceof Error ? err.message : String(err));
     });
@@ -162,7 +164,7 @@ export function PickDeck({ userId, week, games, teams, initialPicks }: Props) {
             teams={teams}
             pick={picks[game.id]}
             onPickTotal={(side) => handlePick(game, "total", side)}
-            onPickSpread={(team) => handlePick(game, "spread", team)}
+            onPickMoneyline={(team) => handlePick(game, "moneyline", team)}
             disabled={!weekOpen || new Date(game.kickoff_at).getTime() <= now}
           />
         ) : (

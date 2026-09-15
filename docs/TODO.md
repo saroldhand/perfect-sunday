@@ -55,6 +55,16 @@ and §4 below. Full runbook and findings:
 7. [ ] Watch Thursday's lock and one live `sync-scores` run by hand — the
        ESPN feed's shape is observed, not documented, and comparing `fetched`
        against `updated` is the check that proves it.
+8. [x] **The spread layer is now a moneyline layer** (migration 0019), at the
+       operator's request, to give people a better chance. Odds of a perfect
+       week move from ~1 in 665 million to ~1 in 20 million — which is exactly
+       where SPEC §2 put them before 0007 quietly moved the product onto the
+       one format that section rejects. `games.spread` is dropped and replaced
+       by `moneyline_home`/`moneyline_away`; `picks.spread_pick` is renamed.
+       Two things worth knowing: the rules page changed, so `TERMS_VERSION`
+       bumped and all four accounts are re-prompted to accept; and 0019 fixes a
+       latent bug in 0006's moneyline grading, where a tied game credited a
+       pick nobody had made.
 
 ---
 
@@ -311,11 +321,15 @@ Held per the no-feature-bloat principle; revisit only when reality demands:
 
 ## 7. Housekeeping
 
-- [ ] **SPEC drift.** SPEC.md still describes the moneyline+spread format,
-      Vercel hosting, and FanDuel-sourced lines; the product is over/under +
-      spread (migration 0007), GitHub Pages, and nflverse-consensus. Future
-      sessions read SPEC as gospel — annotate the changed sections the way
-      §7's share amendment already is, rather than rewriting history.
+- [x] **SPEC drift.** Closed 2026-09-15. SPEC.md described the
+      moneyline+spread format, Vercel hosting and FanDuel-sourced lines; §§1-7
+      now describe what is actually built, each change carrying a dated
+      amendment note in the style §7's share amendment already used, rather
+      than rewriting history. The §2 note is the one to read: it records that
+      0007 moved the live product onto spread + over/under — the single
+      combination §2's own reasoning rejects — without amending the section,
+      and that it went unnoticed for three weeks because the spec still
+      described the format the code had left behind.
 - [ ] **Backups & advisors.** Confirm the Supabase plan's backup story before
       real users' picks exist, and run the dashboard's security/performance
       advisors once against the final schema.

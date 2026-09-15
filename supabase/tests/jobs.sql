@@ -23,10 +23,10 @@ insert into public.weeks (id, season, week_number, locks_at, status)
 values (990, 2099, 1, now() - interval '1 hour', 'open'),
        (991, 2099, 2, now() + interval '2 days', 'open');
 
-insert into public.games (id, week_id, external_id, away_team, home_team, kickoff_at, spread, total, over_odds, under_odds, line_source)
+insert into public.games (id, week_id, external_id, away_team, home_team, kickoff_at, moneyline_home, moneyline_away, total, over_odds, under_odds, line_source)
 values
-  ('cccc0000-0000-4000-8000-000000000001', 990, 'J1', 'LV',  'KC', now(), -3.5, 44.5, -110, -110, 'test'),
-  ('cccc0000-0000-4000-8000-000000000002', 991, 'J2', 'CHI', 'GB', now(), -3.5, 44.5, -110, -110, 'test');
+  ('cccc0000-0000-4000-8000-000000000001', 990, 'J1', 'LV',  'KC', now(), -180, 155, 44.5, -110, -110, 'test'),
+  ('cccc0000-0000-4000-8000-000000000002', 991, 'J2', 'CHI', 'GB', now(), -180, 155, 44.5, -110, -110, 'test');
 
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, created_at, updated_at)
 values ('dddd0000-0000-4000-8000-000000000001','00000000-0000-0000-0000-000000000000','authenticated','authenticated','t-cron@example.test','x',now(),now(),now());
@@ -35,7 +35,7 @@ insert into public.profiles (id, display_name)
 values ('dddd0000-0000-4000-8000-000000000001','Cronny');
 
 -- A complete set for the due week only.
-insert into public.picks (user_id, game_id, total_pick, spread_pick)
+insert into public.picks (user_id, game_id, total_pick, moneyline_pick)
 values ('dddd0000-0000-4000-8000-000000000001','cccc0000-0000-4000-8000-000000000001','OVER','KC');
 
 -- ---------------------------------------------------------------- lock ----

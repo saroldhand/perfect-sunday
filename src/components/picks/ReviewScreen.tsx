@@ -63,7 +63,11 @@ export function ReviewScreen({
             key={game.id}
             game={game}
             pick={picks[game.id]}
-            team={picks[game.id]?.spread ? teams[picks[game.id].spread!] : undefined}
+            team={
+              picks[game.id]?.moneyline
+                ? teams[picks[game.id].moneyline!]
+                : undefined
+            }
             onJump={() => onJump(index)}
           />
         ))}

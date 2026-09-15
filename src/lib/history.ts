@@ -34,9 +34,9 @@ export type HistoryWeek = {
 export type RawHistoryPick = {
   game_id: string;
   total_pick: string | null;
-  spread_pick: string | null;
+  moneyline_pick: string | null;
   total_correct: boolean | null;
-  spread_correct: boolean | null;
+  moneyline_correct: boolean | null;
   games: (Game & { weeks: Week | null }) | null;
 };
 
@@ -52,7 +52,8 @@ function bareGame(game: Game & { weeks: Week | null }): Game {
     home_team: game.home_team,
     away_team: game.away_team,
     kickoff_at: game.kickoff_at,
-    spread: game.spread,
+    moneyline_home: game.moneyline_home,
+    moneyline_away: game.moneyline_away,
     total: game.total,
     over_odds: game.over_odds,
     under_odds: game.under_odds,
@@ -98,9 +99,9 @@ export function toHistoryWeeks(
     bucket.games.push(bareGame(game));
     bucket.results[game.id] = {
       total: (row.total_pick as TotalSide | null) ?? null,
-      spread: row.spread_pick,
+      moneyline: row.moneyline_pick,
       totalCorrect: row.total_correct,
-      spreadCorrect: row.spread_correct,
+      moneylineCorrect: row.moneyline_correct,
     };
   }
 

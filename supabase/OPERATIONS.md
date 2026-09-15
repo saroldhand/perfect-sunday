@@ -73,8 +73,10 @@ operator step to fail. Substitute the season and week number, not an id.
 ## The season is preloaded; the lines are not
 
 Migration 0015 seeds the whole 2026 regular season — 18 weeks, 272 games — with
-matchups, kickoff times and computed lock times, and with `spread`, `total`,
-`over_odds`, `under_odds` and `line_source` all NULL. Schedules are published
+matchups, kickoff times and computed lock times, and with `total`, `over_odds`,
+`under_odds`, `moneyline_home`, `moneyline_away` and `line_source` all NULL.
+(0015 seeded a `spread` column too; migration 0019 replaced it with the
+moneyline pair — see that migration's header for why.) Schedules are published
 months ahead; lines are not. Loading what is known early leaves only the numbers
 to fill in weekly.
 
@@ -102,31 +104,40 @@ correction or when the feed is short.
 
 ```sql
 update public.games g set
-  spread = v.spread, total = v.total,
+  moneyline_home = v.moneyline_home, moneyline_away = v.moneyline_away,
+  total = v.total,
   over_odds = v.over_odds, under_odds = v.under_odds,
-  line_source = 'fanduel'
+  line_source = 'hand-entered'
 from (values
-  ('2026-01-NE-SEA',  -3.5, 44.5, -110, -110),
-  ('2026-01-DAL-PHI',  2.5, 47.5, -105, -115)
+  ('2026-01-NE-SEA',  -150,  130, 44.5, -110, -110),
+  ('2026-01-DAL-PHI',   120, -142, 47.5, -105, -115)
   -- ...one row per game on the slate
-) as v (external_id, spread, total, over_odds, under_odds)
+) as v (external_id, moneyline_home, moneyline_away, total, over_odds, under_odds)
 where g.external_id = v.external_id;
 ```
+
+Both moneyline columns or neither. A game priced on one side only counts as
+missing, so a half-filled row keeps the week shut rather than opening it onto a
+card with one real number and one dash.
 
 `external_id` is `{season}-{week}-{away}-{home}`, e.g. `2026-01-NE-SEA`, and is
 unique across the season, so this needs no week filter.
 
-Set `line_source` to the book the numbers actually came from. If they did not
-come from FanDuel, say so — grading an entry against a line the user never saw
-is the worst failure this product has, and a wrong provenance label is how that
-happens quietly.
+Set `line_source` to where the numbers actually came from. `sync-slate` writes
+`nflverse-consensus`, because that is what nflverse publishes — a consensus
+market number it attributes to no book. If you type numbers in by hand, say so
+rather than borrowing a book's name: grading an entry against a line the user
+never saw is the worst failure this product has, and a wrong provenance label
+is how that happens quietly.
 
 ### Check the slate is complete before opening
 
 ```sql
 select w.week_number,
        count(*) as games,
-       count(*) filter (where g.spread is null or g.total is null) as missing
+       count(*) filter (
+         where not private.line_complete(g.moneyline_home, g.moneyline_away, g.total)
+       ) as missing
 from public.games g
 join public.weeks w on w.id = g.week_id
 where w.season = 2026
@@ -246,12 +257,21 @@ over already-final games changes nothing. That is verified in
 | Combined score beat the total | over correct |
 | Combined score fell short of the total | under correct |
 | Combined score landed exactly on the total | correct for **both** sides |
-| Picked team covered | spread correct |
-| Spread landed exactly on the number | spread correct for **both** sides |
+| Picked team won outright | moneyline correct |
+| Game ended in a tie | moneyline correct for **both** sides |
 | Pick left blank | stays ungraded, never counted correct |
 
-Half-point lines make a landed number rare on either layer, but whole numbers
-do occur and the generous reading avoids arguments.
+Half-point totals make a landed number rare, but whole numbers do occur and the
+generous reading avoids arguments. A tie is the moneyline's only push.
+
+The last row is load-bearing on the moneyline layer, and it is checked before
+the tie rule rather than after. Migration 0006 had those two arms the other way
+round, so a drawn game marked an unmade pick correct — see
+`supabase/tests/scoring.sql`, which asserts it.
+
+Note what is *not* in this table: the prices. A favourite losing is a wrong
+pick like any other, and `score_week` reads neither `moneyline_home` nor
+`moneyline_away`. The odds are there for the card to print, nothing more.
 
 ## 4. Check for a winner
 
@@ -379,8 +399,9 @@ This needs `pg_net` as well as `pg_cron`. Unschedule with
 - Touch a locked or scored week. Its numbers are what entries were graded
   against, and `apply_week_lines` refuses them outright.
 - Open a week with any game missing a line.
-- Write a partial line. A game missing any of spread, total, over odds or under
-  odds is skipped entirely, leaving the column NULL so the week stays shut.
+- Write a partial line. A game missing any of the two moneylines, the total, or
+  the over/under odds is skipped entirely, leaving the columns NULL so the week
+  stays shut.
 
 ### It will, however, open a week on top of an already-open one
 
@@ -605,7 +626,7 @@ week number to rewind a real one.
 To replay the demo week from scratch:
 
 ```sql
-update public.picks p set total_correct = null, spread_correct = null
+update public.picks p set total_correct = null, moneyline_correct = null
 from public.games g, public.weeks w
 where p.game_id = g.id and g.week_id = w.id
   and w.season = 2025 and w.week_number = 18;

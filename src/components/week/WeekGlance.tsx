@@ -12,8 +12,8 @@ const PIP_CLASS: Record<PipState, string> = {
 };
 
 /**
- * The whole week in two rows: one pip per game, totals above spreads, in the
- * order the games kick off. It is the on-screen twin of the grid the share
+ * The whole week in two rows: one pip per game, totals above moneylines, in
+ * the order the games kick off. It is the on-screen twin of the grid the share
  * builds, so what you look at all week and what you post afterwards are the
  * same object.
  */
@@ -48,7 +48,7 @@ export function WeekGlance({
       </div>
 
       <PipRow label="Tot" name="Totals" pips={glance.totals} />
-      <PipRow label="Spr" name="Spreads" pips={glance.spreads} />
+      <PipRow label="ML" name="Moneylines" pips={glance.moneylines} />
     </section>
   );
 }

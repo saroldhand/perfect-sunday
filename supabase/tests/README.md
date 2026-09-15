@@ -26,8 +26,10 @@ Results as of 2026-08-23, all 12 passing:
 | 12 | A signed-out visitor can read display names for the public board | PASS |
 
 Test 7 exists because the fix for test 6 — revoking UPDATE on `picks` and
-re-granting only `total_pick` and `spread_pick` — is exactly the kind of
-change that silently breaks the write path it is meant to narrow.
+re-granting only `total_pick` and `moneyline_pick` — is exactly the kind of
+change that silently breaks the write path it is meant to narrow. Migration
+0019 re-stated that grant when `spread_pick` became `moneyline_pick`, which is
+the same change again.
 
 Test 9 counts affected rows through a CTE rather than reading RETURNING output.
 A blocked UPDATE returns no rows, which looks identical to a statement that ran
@@ -44,7 +46,10 @@ Asserts the grading rules and the guarantees around them. Unlike `rls.sql` it
 runs as one transaction ending in ROLLBACK, on a fixture week numbered 998, so
 it is safe to run against the live project — it cannot touch a real week.
 
-Results as of 2026-08-21, all 11 passing:
+Rewritten for the total/moneyline format by 0019. Results as of 2026-09-15,
+all 13 passing — verified against the live project with 0019's DDL and
+functions applied inside the same transaction and rolled back, so the suite was
+proven before the migration was committed to production:
 
 | Asserts | Result |
 |---|---|
@@ -52,15 +57,30 @@ Results as of 2026-08-21, all 11 passing:
 | An incomplete picker never gets an entry | PASS |
 | A combined score landing exactly on the total counts for both sides | PASS |
 | A total otherwise grades over/under normally | PASS |
-| A spread landing exactly on the number counts for every side | PASS |
+| A tied game counts for both moneyline sides | PASS |
+| **A tie does _not_ credit a moneyline nobody picked** | PASS |
+| A moneyline follows the score, not the posted price | PASS |
 | A perfect entry reads 6/6, alive, perfect | PASS |
 | A busted entry is not alive and not perfect | PASS |
 | The week flips to `scored` once every game is final | PASS |
 | Three consecutive runs change no count | PASS |
 | Three consecutive runs create no extra entries | PASS |
 
-The idempotency cases matter because the Phase 2 job will re-run over
+The idempotency cases matter because the Phase 2 job re-runs over
 already-final games every ten minutes.
+
+The bolded case is a regression test for a real bug. Migration 0006 graded the
+moneyline with the tie arm ahead of the null guard, so a drawn game set
+`moneyline_correct = true` on rows where `moneyline_pick` was null — crediting
+a pick nobody made, which on a complete slate is the difference between a
+busted entry and a perfect one. It never bit, because ties are rare and 0007
+replaced the layer before one happened. 0019 puts the guard first and this
+holds it there.
+
+The price test matters for the same reason in reverse: scoring reads neither
+`moneyline_home` nor `moneyline_away`, because who won does not depend on what
+the win paid. The fixture makes a +155 underdog win outright to prove the grade
+follows the scoreboard.
 
 ## `jobs.sql` — schedulable wrappers
 
@@ -92,34 +112,47 @@ Covers `private.apply_week_lines` and `private.next_week_needing_lines` (0016),
 plus the grants on their `public` wrappers. Fixture weeks 980-982, transaction
 ending in ROLLBACK.
 
-Results as of 2026-08-24, all 16 passing:
+Rewritten for the moneyline payload 2026-09-15. **Not yet run** — run it once
+0019 is applied, the way `scores.sql` was written ahead of 0017. 20 assertions:
 
-| Test | Asserts | Result |
-|---|---|---|
-| 1 | `next_week_needing_lines` picks the earliest unfilled week | PASS |
-| 2 | A partial fill updates the games it has | PASS |
-| 3 | A partial fill reports the remaining gap | PASS |
-| 4 | A partial fill does **not** open the week | PASS |
-| 5 | The week is still `upcoming` after a partial fill | PASS |
-| 6 | A complete fill leaves nothing missing | PASS |
-| 7 | A complete fill opens the week | PASS |
-| 8 | `over_odds` and `under_odds` land in the right columns | PASS |
-| 9 | `line_source` is stored per game | PASS |
-| 10 | A locked week accepts no updates | PASS |
-| 11 | A locked week's line is unchanged | PASS |
-| 12 | A locked week's `line_source` is unchanged | PASS |
-| 13 | A filled week drops out of the sync queue | PASS |
-| 14 | `anon` cannot execute the line writer | PASS |
-| 15 | `authenticated` cannot execute the line writer | PASS |
-| 16 | `service_role` can execute the line writer | PASS |
+| Test | Asserts |
+|---|---|
+| 1 | `next_week_needing_lines` picks the earliest unfilled week |
+| 2 | A partial fill updates the games it has |
+| 3 | A partial fill reports the remaining gap |
+| 4 | A partial fill does **not** open the week |
+| 5 | The week is still `upcoming` after a partial fill |
+| 6 | A one-sided price still counts as missing |
+| 7 | A one-sided price does **not** open the week |
+| 8 | The week is still `upcoming` on a one-sided price |
+| 9 | A complete fill leaves nothing missing |
+| 10 | A complete fill opens the week |
+| 11 | `over_odds` and `under_odds` land in the right columns |
+| 12 | `moneyline_home` and `moneyline_away` land in the right columns |
+| 13 | `line_source` is stored per game |
+| 14 | A locked week accepts no updates |
+| 15 | A locked week's line is unchanged |
+| 16 | A locked week's `line_source` is unchanged |
+| 17 | A filled week drops out of the sync queue |
+| 18 | `anon` cannot execute the line writer |
+| 19 | `authenticated` cannot execute the line writer |
+| 20 | `service_role` can execute the line writer |
 
-Tests 10-12 are the reason this file exists. Every entry in a locked week was
+Tests 14-16 are the reason this file exists. Every entry in a locked week was
 graded against the numbers standing at lock; a feed that rewrites one changes
 what people were scored on after the fact.
 
-Tests 8 and 14-16 guard defaults rather than logic. The source CSV lists
-`under_odds` before `over_odds`, so a positional reader transposes them
-invisibly; and `EXECUTE` is granted to PUBLIC by default on a new function,
+Tests 6-8 are new in 0019. A complete line used to mean `(spread, total)`,
+where one missing number meant one missing column; a moneyline is two columns,
+so a game priced on one side only is a new way for a slate to be incomplete
+while looking filled. `private.line_complete` is the single place that rule
+lives, and these assert it rejects half a price.
+
+Tests 11-12 and 18-20 guard defaults rather than logic. Both column pairs are
+adjacent same-typed ints, and the source CSV lists `under_odds` before
+`over_odds` and `away_moneyline` before `home_moneyline` — so a positional
+reader transposes them invisibly, printing the favourite's price against the
+underdog. And `EXECUTE` is granted to PUBLIC by default on a new function,
 which would put line-writing within reach of the publishable key that ships in
 the build.
 

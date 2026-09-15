@@ -5,7 +5,7 @@
 // This file is deliberately thin. Everything that can be wrong in a way nobody
 // notices lives somewhere testable:
 //
-//   - normalising a feed row, including the spread sign flip
+//   - normalising a feed row, including which columns carry the moneyline
 //       -> _shared/oddsProvider.ts, covered by src/lib/oddsProvider.test.ts
 //   - refusing a locked week, opening only a complete slate
 //       -> private.apply_week_lines, covered by supabase/tests/lines.sql

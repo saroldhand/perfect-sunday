@@ -11,15 +11,19 @@ export function formatTotal(total: number | null): string {
 }
 
 /**
- * `spread` on a game is the home team's line, so the away side is its
- * negation. Returned with an explicit sign because "CIN -3.5" and "BAL +3.5"
- * only mean anything together.
+ * The American price on one side of a game, e.g. "-305" or "+245".
+ *
+ * Replaces the spread's `lineFor`, and the shape of the problem changed with
+ * it: a spread was one number the away side negated, so the side picked a
+ * sign. A moneyline is two independent prices, so the side picks a column and
+ * the stored sign is printed as it stands — formatOdds adds the + that a
+ * positive price needs to read as a price.
  */
-export function lineFor(spread: number | null, side: "home" | "away"): string {
-  if (spread === null) return "—";
-  const value = side === "home" ? spread : -spread;
-  const rounded = Math.abs(value) % 1 === 0 ? value.toFixed(0) : value.toFixed(1);
-  return value > 0 ? `+${rounded}` : rounded;
+export function priceFor(
+  game: { moneyline_home: number | null; moneyline_away: number | null },
+  side: "home" | "away",
+): string {
+  return formatOdds(side === "home" ? game.moneyline_home : game.moneyline_away);
 }
 
 const KICKOFF_FORMAT = new Intl.DateTimeFormat("en-US", {

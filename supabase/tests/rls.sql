@@ -25,17 +25,17 @@ insert into public.weeks (id, season, week_number, locks_at, status)
 values (999, 2026, 1, '2026-09-10T20:00:00Z', 'open')
 on conflict (id) do update set status = 'open';
 
-insert into public.games (id, week_id, external_id, home_team, away_team, kickoff_at, spread, total, over_odds, under_odds, line_source)
+insert into public.games (id, week_id, external_id, home_team, away_team, kickoff_at, moneyline_home, moneyline_away, total, over_odds, under_odds, line_source)
 values
-  ('aaaaaaaa-0000-4000-8000-000000000001', 999, 'rls-test-game-1', 'CIN', 'BAL', '2026-09-13T17:00:00Z', -3.5, 44.5, -110, -110, 'demo'),
-  ('aaaaaaaa-0000-4000-8000-000000000002', 999, 'rls-test-game-2', 'KC',  'DEN', '2026-09-13T20:05:00Z', -7.5, 42.5, -110, -110, 'demo')
+  ('aaaaaaaa-0000-4000-8000-000000000001', 999, 'rls-test-game-1', 'CIN', 'BAL', '2026-09-13T17:00:00Z', -180, 155, 44.5, -110, -110, 'demo'),
+  ('aaaaaaaa-0000-4000-8000-000000000002', 999, 'rls-test-game-2', 'KC',  'DEN', '2026-09-13T20:05:00Z', -350, 280, 42.5, -110, -110, 'demo')
 on conflict (id) do nothing;
 
 -- === TEST 1: owner writes their own pick while the week is open. Expect PASS ==
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
-insert into public.picks (user_id, game_id, total_pick, spread_pick)
+insert into public.picks (user_id, game_id, total_pick, moneyline_pick)
 values ('11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-4000-8000-000000000001','OVER','CIN')
 on conflict (user_id, game_id) do update set total_pick = excluded.total_pick;
 commit;
@@ -71,18 +71,18 @@ rollback;
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"22222222-2222-2222-2222-222222222222","role":"authenticated"}', true);
-insert into public.picks (user_id, game_id, total_pick, spread_pick)
+insert into public.picks (user_id, game_id, total_pick, moneyline_pick)
 values ('11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-4000-8000-000000000001','UNDER','BAL');
 rollback;
 
 -- === TEST 6: user marks their own pick correct. Expect ERROR 42501 ===========
 -- RLS cannot express column rules; this is enforced by the column grant on
--- (total_pick, spread_pick).
+-- (total_pick, moneyline_pick).
 -- Expected: permission denied for table picks
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
-update public.picks set total_correct = true, spread_correct = true
+update public.picks set total_correct = true, moneyline_correct = true
 where user_id = '11111111-1111-1111-1111-111111111111';
 rollback;
 
@@ -91,7 +91,7 @@ rollback;
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
-update public.picks set total_pick = 'UNDER', spread_pick = 'BAL'
+update public.picks set total_pick = 'UNDER', moneyline_pick = 'BAL'
 where user_id = '11111111-1111-1111-1111-111111111111'
 returning 'TEST 7 A edits own pick while open' as test, total_pick, 'PASS' as verdict;
 rollback;
@@ -129,7 +129,7 @@ rollback;
 begin;
 set local role authenticated;
 select set_config('request.jwt.claims','{"sub":"11111111-1111-1111-1111-111111111111","role":"authenticated"}', true);
-insert into public.picks (user_id, game_id, total_pick, spread_pick)
+insert into public.picks (user_id, game_id, total_pick, moneyline_pick)
 values ('11111111-1111-1111-1111-111111111111','aaaaaaaa-0000-4000-8000-000000000002','OVER','KC');
 rollback;
 
