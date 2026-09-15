@@ -134,39 +134,37 @@ once, in the SQL editor:
 [tests/scores.sql](tests/scores.sql) (expect 21 of 21 PASS),
 [tests/lines.sql](tests/lines.sql), [tests/jobs.sql](tests/jobs.sql).
 
-## Step 2 — the demo week: a decision, not a cleanup
+## Step 2 — the demo week — DONE, kept rather than deleted
 
-**Blocked on the operator.** The 2025 Week 18 demo week is still `open`, its
-lock time passed on Thu 10 Sep, and it holds **49 picks from 4 real accounts**
-— three complete 16-of-16 sets. Deleting it, which is what this runbook said
-before the database could be read, would destroy other people's picks. That is
-not a cosmetic tidy-up and it is not reversible.
-
-Two consequences of leaving it as it is, both worth knowing:
-
-- Being `open` is what makes the live app show a 2025 demo slate today. But it
-  stops mattering the moment Week 2 opens: `selectCurrentWeek` takes the
-  **latest** `locks_at` among weeks in play, and Week 2 (Thu 17 Sep) is later
-  than the demo (Thu 10 Sep). So Step 4 fixes the visible symptom on its own.
-- It is still pickable, and once `lock-due-weeks` is scheduled (Step 5) the
-  job will lock it on its first tick — its `locks_at` is in the past — and
-  create entries for the three complete sets. Harmless but untidy, and it is
-  a reason to settle this before Step 5, not after.
-
-The options, least destructive first:
-
-| Option | Keeps the 49 picks | Board stays clean | Note |
-|---|---|---|---|
-| `status = 'upcoming'` | yes | yes | Inert everywhere, exactly like Week 1: every job filters on status or on `locks_at > now()`. Semantically odd for a past week, which is the same wart Week 1 carries. **Recommended.** |
-| Leave `open` | yes | yes | Needs nothing, but stays pickable and will be locked by the Step 5 cron. |
-| `status = 'scored'` | yes | **no** | `getLastScoredWeek` orders by season descending, so with no 2026 week scored the demo becomes the board's "most recent finished week" — and it has no entries, so the board shows an empty result. |
-| `delete` | **no** | yes | Cascades to its 16 games, 49 picks and entries. Cleanest state, destroys the only real usage data this product has. |
+**Settled 2026-09-15: `status = 'upcoming'`.** The operator's call, and the
+right one — the week held **49 picks from 4 real accounts** (complete 16-of-16
+sets for `Harry S`, `Baller` and `max`; `EK` picked one game), so deleting it,
+which is what this runbook first recommended, would have destroyed the only
+real usage data the product has.
 
 ```sql
--- The recommended option. One row.
 update public.weeks set status = 'upcoming'
 where season = 2025 and week_number = 18;
 ```
+
+What that buys, all verified against production:
+
+- The picks are intact — 49, unchanged.
+- It is inert everywhere. Every job filters on status or on `locks_at > now()`,
+  so `lock_due_weeks` will not lock it once cron is on, `sync-slate` will not
+  refill it, and `sync-scores` will not fetch it. Same state Week 1 sits in.
+- It is off the live app: `selectCurrentWeek` only considers `open` or
+  `locked` weeks first, then upcoming weeks whose lock is still ahead.
+- The board stays clean, which `scored` would not have — `getLastScoredWeek`
+  orders by season descending, so a scored 2025 week would have become the
+  board's "most recent finished week" with no entries behind it.
+
+The one cost of keeping it was that those 49 picks had nowhere to be seen, so
+the same change added a place: **a Previous tab** (`/history`), listing every
+week already gone by that you have picks in, newest first, with the same rows
+and grade chips My Week uses. It keys off the clock — `locks_at <= now` —
+rather than off `scored`, which is what lets it show this demo week at all,
+and what will stop it hiding a real week halfway through being graded.
 
 ## Step 3 — leave Week 1 alone, deliberately
 
@@ -285,7 +283,8 @@ Two checks that only the first live run can settle:
 - [x] Step 0 probes run, output read
 - [x] Migrations applied — 0013, 0014, 0015, 0016, 0017; 0015 digest-verified
 - [ ] `tests/scores.sql` run in the SQL editor (21 of 21 PASS)
-- [ ] **Demo week decided** (Step 2) — blocked on the operator; 49 real picks
+- [x] **Demo week decided** (Step 2) — set to `upcoming`; 49 picks kept, and
+      a Previous tab added so they can be looked at
 - [x] Week 1 confirmed pick-free and left `upcoming`; live functions skip it
 - [ ] `sync-slate` and `sync-scores` deployed
 - [ ] Week 2 lines in, `missing: 0`, week `open` — **before Thu 4:00 PM ET**

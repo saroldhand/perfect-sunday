@@ -31,12 +31,11 @@ week needs a decision. Full runbook and findings:
        not exist as rows, which is the real reason Week 1 never happened.
 2. [x] Migrations 0013-0017 applied and verified. 0015's 272 games were
        digest-checked against the repo file rather than eyeballed.
-3. [ ] **Decide the demo week** — no longer a cleanup. It holds **49 picks
-       from 4 real accounts** (three complete sets), so deleting it destroys
-       the only real usage data the product has. CATCHUP.md Step 2 lays out
-       four options; `status = 'upcoming'` keeps the picks and is inert
-       everywhere. Settle it before scheduling cron, which would otherwise
-       lock the demo week on its first tick.
+3. [x] **Demo week decided** — set to `upcoming`, keeping all **49 picks from
+       4 real accounts**. Deleting it would have destroyed the only real usage
+       data the product has. It is now inert in every job and off the live app,
+       and the board stays clean. A **Previous tab** was added in the same
+       change so those picks have somewhere to be seen.
 4. [x] Week 1 left `upcoming`. Confirmed inert against the live database:
        `next_week_needing_lines()` returns Week 2, skipping it unprompted.
 5. [ ] `supabase functions deploy sync-slate sync-scores` — **neither has
@@ -270,8 +269,14 @@ Ranked by retention-per-effort; none block the first share.
    sign-in screen with the line ticker — decent, but the full slate with real
    numbers is the pitch. Watch whether invited friends convert first; build
    only if they stall.
-5. **My Picks history.** Once three-plus weeks exist people will want their
-   season at a glance. Phase 3 as planned.
+5. ~~**My Picks history.**~~ **Built 2026-09-15** — a Previous tab listing
+   every past week you have picks in, newest expanded, reusing My Week's rows
+   and grade chips. Brought forward from Phase 3 because keeping the demo
+   week's 49 picks rather than deleting them meant they needed somewhere to
+   live. What counts as "previous" is the clock (`locks_at <= now`), not
+   `scored`: that is what shows a week that was never locked, and what stops
+   it hiding a week halfway through grading. Grouping is a pure function in
+   `lib/history.ts`, tested without a database, matching `lib/season.ts`.
 
 ---
 

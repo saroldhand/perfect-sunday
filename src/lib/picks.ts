@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import type { RawHistoryPick } from "@/lib/history";
 
 /** A total pick is a side of the number, not a team. */
 export type TotalSide = "OVER" | "UNDER";
@@ -140,4 +141,30 @@ export async function getResults(
     };
   }
   return map;
+}
+
+/**
+ * Every pick the user has ever made, with its game and week attached, for the
+ * Previous screen. Grouped into weeks by toHistoryWeeks, which is where the
+ * "what counts as previous" rule lives and is tested.
+ *
+ * The inner joins are what let a row carry its week, and are why a returned
+ * row can never be weekless — the same reason getSeasonEntries uses them.
+ * Deliberately unfiltered by week: the clock test belongs in one place, and
+ * that place is a pure function rather than a query string.
+ */
+export async function getHistoryPicks(userId: string): Promise<RawHistoryPick[]> {
+  const games =
+    "id, home_team, away_team, kickoff_at, spread, total, over_odds, under_odds, home_score, away_score, status";
+  const weeks = "id, season, week_number, locks_at, status";
+
+  const { data, error } = await supabase
+    .from("picks")
+    .select(
+      `game_id, total_pick, spread_pick, total_correct, spread_correct, games!inner(${games}, weeks!inner(${weeks}))`,
+    )
+    .eq("user_id", userId);
+
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as RawHistoryPick[];
 }
