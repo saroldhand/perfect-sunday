@@ -1,5 +1,12 @@
 # Running a week by hand
 
+> **2026-09-15 — the database is behind the repo.** The project was paused
+> across the Week 1 opener, so nothing here has been run against production
+> yet. Work [CATCHUP.md](CATCHUP.md) first; it is the one-time runbook that
+> gets the database to a live Week 2. One correction it carries: the demo-week
+> cutover below says mark it `scored`, which was right before the season
+> started and is wrong now — delete it instead, and CATCHUP.md Step 2 says why.
+
 The operator runs three steps from the Supabase SQL editor. All three can now be
 automated instead — `sync-slate` opens a week once its lines land, and `pg_cron`
 can run the lock and grade jobs — but **nothing is scheduled by default**, so

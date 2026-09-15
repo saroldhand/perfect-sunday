@@ -1,10 +1,16 @@
 # Pre-launch to-do — getting Perfect Sunday ready to share
 
-Written 2026-08-27. **Week 1 locks Wednesday 9 September, 7:50 PM ET** — thirteen
-days out — so this is ordered by that calendar, not by theme. The goal is not
-more features; it is that the loop that already exists — pick, share, sweat,
-compare, return — runs without a stumble for someone who arrived from a group
-text and will not give it a second chance.
+Written 2026-08-27, **amended 2026-09-15**. The goal is not more features; it
+is that the loop that already exists — pick, share, sweat, compare, return —
+runs without a stumble for someone who arrived from a group text and will not
+give it a second chance.
+
+**Calendar correction.** This document was ordered around Week 1 locking on
+Wednesday 9 September. That has passed. The Supabase project was paused across
+the opener, so none of the operator steps below ran and **Week 1 never
+happened** — no lines, no picks, no grades. The next live deadline is **Week 2,
+which locks Thursday 17 September, 4:00 PM ET**. Read the calendar references
+below as history, not instructions.
 
 Product philosophy, restated so every item below is judged against it: easy to
 play, easy to follow, easy to share. Anything that does not serve one of those
@@ -14,21 +20,31 @@ three waits.
 
 ## ⚠ Do next — operator, high priority
 
-**Switch on `sync-scores`.** The code merged 2026-08-27, but it is inert until
-these run — and without them nothing marks games final, so no pick grades on
-game day. All dashboard/CLI steps only the operator can do; the repo side is
-finished. Details for each live in
-[supabase/OPERATIONS.md](../supabase/OPERATIONS.md).
+**Catch the database up, then get Week 2 open.** The repo has not moved since
+2026-08-27 and the database has not moved at all; the paused project means the
+gap is now nineteen days wide. The full ordered runbook — state probes first,
+because none of it could be verified from a session without database access —
+is [supabase/CATCHUP.md](../supabase/CATCHUP.md). In short:
 
-1. [ ] Apply migration `0017_sync_scores.sql` in the Supabase SQL editor.
-2. [ ] Run [supabase/tests/scores.sql](../supabase/tests/scores.sql) there —
-       expect 21 of 21 PASS.
-3. [ ] `supabase functions deploy sync-scores`
-4. [ ] Schedule it — the `*/5 * * * *` `cron.schedule` snippet in
-       OPERATIONS.md (needs `pg_cron` and `pg_net` enabled).
-5. [ ] On its first game day, run it once by hand and check `fetched` against
-       `updated` in the report — the feed's shape is observed, not documented,
-       and this is the check that proves it.
+1. [ ] Run CATCHUP.md's Step 0 probes and read the output before changing
+       anything.
+2. [ ] Apply the outstanding migrations — `0017_sync_scores.sql` at minimum —
+       and run [supabase/tests/scores.sql](../supabase/tests/scores.sql),
+       expecting 21 of 21 PASS.
+3. [ ] **Delete the 2025 demo week.** It is still `open`, and an open week
+       beats everything, so the deployed app showed a 2025 demo slate through
+       the whole opening week. This is the one item that is actively wrong on
+       the live site right now.
+4. [ ] Leave Week 1 `upcoming` — it is inert there, and backfilling it would
+       mean grading against lines nobody was shown. CATCHUP.md Step 3 shows
+       why, and the one way to break it.
+5. [ ] `supabase functions deploy sync-slate sync-scores`, then run
+       `sync-slate` to open Week 2 — **before Thursday 4:00 PM ET.**
+6. [ ] Schedule all four cron jobs. The pause is the argument for automation:
+       a week nobody is watching is a week that does not happen.
+7. [ ] Watch Thursday's lock and one live `sync-scores` run by hand — the
+       ESPN feed's shape is observed, not documented, and comparing `fetched`
+       against `updated` is the check that proves it.
 
 ---
 
@@ -119,10 +135,19 @@ OAuth would have solved.)
 
 ## 2. Season setup — done in the repo, verify it in the project
 
+**Superseded 2026-09-15 by [supabase/CATCHUP.md](../supabase/CATCHUP.md).**
+Every item in this section is still real work, but its framing — "before Week 1
+opens" — is a fortnight out of date, and two items changed answer once the
+opener passed: the demo week should now be *deleted* rather than marked
+`scored` (a `scored` 2025 week becomes the board's "last scored" week, since no
+2026 week outranks it), and Week 1's lines should **not** be filled at all.
+Work the runbook; read this for context.
+
 The schedule work is finished; what remains is confirming the live database
 matches the repo and switching the machinery on. (The Supabase MCP server was
-unreachable from the session that wrote this doc, so none of this could be
-checked against production — treat every box as unverified.)
+unreachable from the session that wrote this doc, and from the one that amended
+it — see CATCHUP.md's preamble — so none of this could be checked against
+production. Treat every box as unverified.)
 
 - [ ] **Verify migrations 0013–0016 are applied** to `vockiqvlijtkxvpdttya`.
       There is no migrations table; OPERATIONS.md shows the
