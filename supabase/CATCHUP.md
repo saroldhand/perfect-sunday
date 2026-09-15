@@ -203,63 +203,59 @@ already in if they picked against them, so `private.lock_week(...)` then
 whether to run a week whose games finished before it was ever locked is a call
 about the contest's integrity, not a SQL step.
 
-## Step 4 — get Week 2 open, before Thursday 4:00 PM ET
+## Step 4 — Week 2 is open — DONE
 
-The functions are in the repo but have never been deployed:
+Both functions deployed (they had never been deployed; the project had zero),
+and `sync-slate` run against production. Its report:
 
-```bash
-supabase functions deploy sync-slate
-supabase functions deploy sync-scores
+```json
+{ "status": "ok", "weekId": 4, "season": 2026, "week": 2,
+  "lineSource": "nflverse-consensus",
+  "fetched": 16, "updated": 16, "missing": 0, "opened": true }
 ```
 
-Then pull Week 2's lines. With the demo gone and Week 1 filtered out by the
-clock, the no-argument call selects Week 2 on its own:
+`fetched` equal to `updated` is the part worth reading: every row the parser
+produced matched a games row, so there is no silent gap. **Week 2 is open and
+taking picks**, and it is the only week in play, so the app resolves to it.
 
-```bash
-curl -X POST "https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate" \
-  -H "Authorization: Bearer $SUPABASE_ANON_KEY"
-```
+The lines were checked rather than trusted, because the one transcription slip
+that would matter here grades every spread backwards while looking entirely
+normal. The sign convention came through correctly — `games.spread` is the
+home line, negative when the home team is favoured — and the live data agrees:
+SEA at ARI is `+4.5` and PHI at TEN is `+7.0` (road favourites give a positive
+home number), MIA at SF is `-13.5`. All 16 games complete, one `line_source`,
+totals 39.5 to 53.5, no game with both odds positive.
 
-Read the report. `missing: 0` with `opened: true` means Week 2 is taking picks.
-`missing` above zero means the feed was short and the week correctly stayed
-shut — re-run it on the hour, or fill the gaps with the manual `VALUES`
-fallback in OPERATIONS.md. A week that will not open is the thing to catch
-today, not Thursday afternoon.
+**On `verify_jwt`.** Both functions are deployed with it on, and the
+publishable key satisfies it when sent as both `apikey` and
+`Authorization: Bearer`. This matters because the cron snippets in
+OPERATIONS.md sent neither, and `net.http_post` returns a request id whether
+or not the call is accepted — so the schedule would have 401'd on every tick
+with nothing in `cron.job_run_details` to say so. Those snippets are fixed,
+and OPERATIONS.md now says how to read a run's real outcome out of
+`net._http_response`.
 
-## Step 5 — switch the automation on
+## Step 5 — automation: three of four on
 
-Left off all season because the demo week was driven by hand. That reason is
-now gone, and the pause just demonstrated the cost: a week nobody was watching
-is a week that does not happen.
+`pg_cron` 1.6.4 and `pg_net` 0.20.4 installed (neither was present), and three
+jobs scheduled and active:
 
-```sql
-create extension if not exists pg_cron;
-create extension if not exists pg_net;
+| Job | Schedule | Verified |
+|---|---|---|
+| `lock-due-weeks` | `*/10 * * * *` | Nothing due — Week 2 locks Thu |
+| `score-due-weeks` | `*/10 * * * *` | No locked week; no-op |
+| `sync-scores` | `*/5 * * * *` | Invoked by hand: 200, `nothing-to-do` |
 
-select cron.schedule('lock-due-weeks',  '*/10 * * * *', $$select private.lock_due_weeks()$$);
-select cron.schedule('score-due-weeks', '*/10 * * * *', $$select private.score_due_weeks()$$);
+**`sync-slate` is deliberately NOT scheduled.** It would open Week 3 on top of
+an open Week 2 within the hour, and `selectCurrentWeek` takes the latest lock
+among weeks in play, so Week 3 would hide Week 2 before anyone finished
+picking. `next_week_needing_lines()` already returns Week 3, so this is not
+hypothetical. Schedule it once Week 2 has locked and the weekly sequence is
+back in step — the snippet and the full explanation, including the two
+candidate durable fixes, are under "It will, however, open a week on top of an
+already-open one" in [OPERATIONS.md](OPERATIONS.md).
 
-select cron.schedule('sync-slate', '0 * * * *', $$
-  select net.http_post(
-    url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate',
-    headers := '{"Content-Type":"application/json"}'::jsonb
-  );
-$$);
-
-select cron.schedule('sync-scores', '*/5 * * * *', $$
-  select net.http_post(
-    url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-scores',
-    headers := '{"Content-Type":"application/json"}'::jsonb
-  );
-$$);
-```
-
-All four are idempotent and cheap when idle. `cron.schedule` runs in UTC;
-none of these needs a wall-clock time, which is the point of selecting by
-status and `locks_at`.
-
-If the pause dropped jobs that had been scheduled before it, `cron.schedule`
-with an existing name replaces it, so re-running the block is safe.
+Switching any of it off: `select cron.unschedule('<jobname>');`
 
 ## Step 6 — watch Thursday and Sunday by hand, once
 
@@ -286,9 +282,12 @@ Two checks that only the first live run can settle:
 - [x] **Demo week decided** (Step 2) — set to `upcoming`; 49 picks kept, and
       a Previous tab added so they can be looked at
 - [x] Week 1 confirmed pick-free and left `upcoming`; live functions skip it
-- [ ] `sync-slate` and `sync-scores` deployed
-- [ ] Week 2 lines in, `missing: 0`, week `open` — **before Thu 4:00 PM ET**
-- [ ] `pg_cron` + `pg_net` installed, four cron jobs scheduled and active
+- [x] `sync-slate` and `sync-scores` deployed, and each invoked successfully
+- [x] Week 2 lines in, `missing: 0`, week `open`, spread sign verified
+- [x] `pg_cron` + `pg_net` installed; `lock-due-weeks`, `score-due-weeks` and
+      `sync-scores` scheduled and active
+- [ ] **`sync-slate` scheduled — after Week 2 locks**, per the week-ordering
+      hazard in OPERATIONS.md
 - [ ] Thursday lock spot-checked; `sync-scores` watched once live
 
 The repo itself needs no changes for any of it: tests are 108/108 green, `tsc`

@@ -334,10 +334,25 @@ nothing, since it returns `nothing-to-do` when no week needs lines.
 select cron.schedule('sync-slate', '0 * * * *', $$
   select net.http_post(
     url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate',
-    headers := '{"Content-Type":"application/json"}'::jsonb
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'apikey', 'sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb',
+      'Authorization', 'Bearer sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb'
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
   );
 $$);
 ```
+
+**The key headers are not optional.** Both functions are deployed with
+`verify_jwt` on, so a post without them is rejected before the function runs —
+an earlier version of this snippet sent only `Content-Type` and would have
+failed every tick silently, since `net.http_post` returns a request id
+whether or not the call succeeds. The publishable key is the right one to use
+here: it already ships in the browser bundle, so putting it in a cron
+definition leaks nothing, and it keeps the service-role key out of the
+automation exactly as migration 0014 intended.
 
 This needs `pg_net` as well as `pg_cron`. Unschedule with
 `select cron.unschedule('sync-slate');`.
@@ -349,6 +364,41 @@ This needs `pg_net` as well as `pg_cron`. Unschedule with
 - Open a week with any game missing a line.
 - Write a partial line. A game missing any of spread, total, over odds or under
   odds is skipped entirely, leaving the column NULL so the week stays shut.
+
+### It will, however, open a week on top of an already-open one
+
+`next_week_needing_lines()` selects on `status = 'upcoming'`, so the moment a
+week opens it stops being a candidate and the *next* one becomes one. In the
+normal weekly rhythm that is exactly right and never collides: a week is
+`scored` by Monday night, and the next week's lines land on Tuesday, so only
+one week is ever in play.
+
+Out of cadence it collides, and the collision is not benign.
+`selectCurrentWeek` prefers weeks that are `open` or `locked` and, among them,
+takes the **latest** `locks_at` — so a newly opened week hides the one before
+it. If Week N is open and taking picks, and Week N+1's lines land and open it,
+the app jumps to Week N+1 and nobody can finish their Week N picks.
+
+This is live right now: Week 2 opened out of cadence on Tue 15 Sep, and
+`next_week_needing_lines()` already returns Week 3. **That is why `sync-slate`
+is deliberately the one job not scheduled.** Schedule it once Week 2 has
+locked and the sequence is back in step:
+
+```sql
+-- After Week 2 locks. The snippet is under "Scheduling it" above.
+select cron.schedule('sync-slate', '0 * * * *', $$ ... $$);
+```
+
+The durable fix is a product decision rather than a patch, which is why this
+session did not make it. Either `next_week_needing_lines` should decline to
+open a week while an earlier one is still `open`, or `selectCurrentWeek`
+should prefer the *earliest* week in play — which is arguably what its own
+comment already describes ("between Thursday's lock and the last game going
+final, the week the user cares about is the one they are already in"), and
+which would also show a locked Week N rather than an open Week N+1 during
+Sunday's games. The cost of earliest-first is that one week left `locked`
+because a game never went final would pin the app there, which is the case
+the current "latest" rule was written for.
 
 ## sync-scores: pulling the results
 
@@ -414,10 +464,19 @@ to maintain or get wrong on a Thursday, a Saturday, or Christmas morning.
 select cron.schedule('sync-scores', '*/5 * * * *', $$
   select net.http_post(
     url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-scores',
-    headers := '{"Content-Type":"application/json"}'::jsonb
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'apikey', 'sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb',
+      'Authorization', 'Bearer sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb'
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
   );
 $$);
 ```
+
+The key headers are required here too — see the note under sync-slate's
+schedule. This job is already scheduled and running.
 
 Same requirements as sync-slate: `pg_cron` and `pg_net`. Keep
 `score-due-weeks` scheduled as well — grading rides inside
@@ -491,6 +550,22 @@ select cron.schedule('score-due-weeks', '*/10 * * * *',
 `cron.schedule` runs in UTC. Neither job needs a wall-clock time, which is the
 point of selecting by status and `locks_at` — there is no Eastern offset to get
 wrong here, and no DST shift to track.
+
+### Reading what a scheduled run actually did
+
+`net.http_post` hands back a request id immediately and never fails on the
+function's behalf, so a job showing `succeeded` in `cron.job_run_details`
+means the post was *sent*, not that the function worked. The response is the
+thing to read:
+
+```sql
+select r.id, r.status_code, r.error_msg, r.content
+from net._http_response r
+order by r.id desc
+limit 10;
+```
+
+A 401 there means the key headers above are missing from the schedule.
 
 To check and to switch off:
 

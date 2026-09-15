@@ -20,10 +20,10 @@ three waits.
 
 ## ⚠ Do next — operator, high priority
 
-**Get Week 2 open before Thursday 4:00 PM ET.** The schema is now caught up —
-migrations 0013-0017 were applied and verified on 2026-09-15 — but the two
-Edge Functions have never been deployed, nothing is scheduled, and the demo
-week needs a decision. Full runbook and findings:
+**Week 2 is open.** As of 2026-09-15 the database is caught up, both Edge
+Functions are deployed, and locking and scoring are on a timer. What is left
+is one scheduling step held back on purpose, and the pre-launch items in §1
+and §4 below. Full runbook and findings:
 [supabase/CATCHUP.md](../supabase/CATCHUP.md). In short:
 
 1. [x] Step 0 probes run. The database was at **migration 0012** — five back,
@@ -38,10 +38,15 @@ week needs a decision. Full runbook and findings:
        change so those picks have somewhere to be seen.
 4. [x] Week 1 left `upcoming`. Confirmed inert against the live database:
        `next_week_needing_lines()` returns Week 2, skipping it unprompted.
-5. [ ] `supabase functions deploy sync-slate sync-scores` — **neither has
-       ever been deployed**; the project has zero Edge Functions.
-6. [ ] Install `pg_cron` and `pg_net` (neither is present), then schedule the
-       four jobs.
+5. [x] Both functions deployed and invoked against production. `sync-slate`
+       reported `fetched: 16, updated: 16, missing: 0, opened: true` — **Week 2
+       is open and taking picks**, and the spread sign was verified against the
+       live data rather than assumed.
+6. [x] `pg_cron` and `pg_net` installed; `lock-due-weeks`, `score-due-weeks`
+       and `sync-scores` scheduled and active. **`sync-slate` is deliberately
+       not scheduled** — it would open Week 3 on top of the open Week 2, and
+       `selectCurrentWeek` would then hide Week 2. Schedule it after Week 2
+       locks; see OPERATIONS.md for the hazard and the two candidate fixes.
 7. [ ] Watch Thursday's lock and one live `sync-scores` run by hand — the
        ESPN feed's shape is observed, not documented, and comparing `fetched`
        against `updated` is the check that proves it.
