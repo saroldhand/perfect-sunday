@@ -89,21 +89,21 @@ export default function Hub() {
   // read the same games in the same kickoff order.
   const shareResultsFor = () => {
     const totals = games.map((g) => results[g.id]?.totalCorrect ?? null);
-    const spreads = games.map((g) => results[g.id]?.spreadCorrect ?? null);
+    const moneylines = games.map((g) => results[g.id]?.moneylineCorrect ?? null);
     return buildResultsShare({
       weekNumber: week?.week_number ?? 0,
       totals,
-      spreads,
+      moneylines,
       // The entry's own count is authoritative — it is what the board ranks on
       // — so the share agrees with the standings rather than recounting.
       correct:
         myEntry?.correct_count ??
-        [...totals, ...spreads].filter((g) => g === true).length,
+        [...totals, ...moneylines].filter((g) => g === true).length,
       possible: myEntry?.picks_possible ?? games.length * 2,
       clause: resultClause({
         kickoffs: games.map((g) => g.kickoff_at),
         totals,
-        spreads,
+        moneylines,
       }),
     });
   };

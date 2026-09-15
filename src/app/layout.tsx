@@ -23,7 +23,7 @@ const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 export const metadata: Metadata = {
   title: "Perfect Sunday",
   description:
-    "Pick every over/under and every spread on the NFL slate. Get them all right and win the prize.",
+    "Pick every over/under and every winner on the NFL slate. Get them all right and win the prize.",
   applicationName: "Perfect Sunday",
   appleWebApp: {
     capable: true,

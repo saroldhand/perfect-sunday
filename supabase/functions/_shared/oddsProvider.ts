@@ -15,10 +15,18 @@ export type LineRow = {
   /** Matches `games.external_id`, e.g. "2026-01-NE-SEA". */
   externalId: string;
   /**
-   * The home team's line, negative when the home team is favoured — the
-   * convention in `games.spread` and the one the scoring functions apply.
+   * American odds on each team winning outright, e.g. -218 and +180. Both
+   * sides are carried rather than just the favourite's price, because the deck
+   * shows each side its own number and the pair only means anything together.
+   *
+   * Unlike the spread this replaced, there is no sign convention to translate:
+   * a moneyline is each team's own price, not one number applied to the home
+   * team, so a feed cannot disagree with us about which way it points. The
+   * sign is part of the value — negative is the favourite — and is passed
+   * through untouched.
    */
-  spread: number;
+  moneylineHome: number;
+  moneylineAway: number;
   total: number;
   overOdds: number;
   underOdds: number;
@@ -69,10 +77,25 @@ export const nflverseProvider: OddsProvider = {
  * The half of the provider that can be wrong in a way nobody notices, kept
  * pure so it can be tested without a network.
  *
- * Rows without a complete set of four numbers are dropped rather than
- * part-filled. A game with a spread and no total is not a game anyone can pick,
- * and leaving it NULL is what keeps the week from opening — which is the
+ * Rows without a complete set of five numbers are dropped rather than
+ * part-filled. A game with a moneyline and no total is not a game anyone can
+ * pick, and leaving it NULL is what keeps the week from opening — which is the
  * behaviour SPEC §5 wants.
+ *
+ * Moneyline coverage in this feed effectively matches the spread coverage it
+ * replaces, but only back to 2015, and not perfectly. Measured on the file:
+ *
+ *   - 2015-2025 REG: 2,894 of 2,895 games carry both prices. The one exception,
+ *     2017_04_CHI_GB, has a spread and a total but no moneyline.
+ *   - 2026 REG: every game that carries a spread carries both moneylines.
+ *   - before 2015: no moneylines at all, so 1,902 older games have a spread and
+ *     no price. Irrelevant to a product syncing the current season, and stated
+ *     so nobody backfills an old season from here and wonders why it stays shut.
+ *
+ * That single 2017 gap is the case this drop rule exists for: the row is
+ * skipped, the game keeps NULL prices, the week does not open, and
+ * apply_week_lines reports it as missing. A week held shut is visible and
+ * fixable; a week opened on a price nobody posted is neither.
  */
 export function parseNflverseGames(
   csv: string,
@@ -97,11 +120,18 @@ export function parseNflverseGames(
     // pull a wild-card game into the regular season's Week 1.
     if (at(row, "game_type") !== "REG") continue;
 
-    const spread = num(at(row, "spread_line"));
+    const moneylineHome = num(at(row, "home_moneyline"));
+    const moneylineAway = num(at(row, "away_moneyline"));
     const total = num(at(row, "total_line"));
     const overOdds = num(at(row, "over_odds"));
     const underOdds = num(at(row, "under_odds"));
-    if (spread === null || total === null || overOdds === null || underOdds === null) {
+    if (
+      moneylineHome === null ||
+      moneylineAway === null ||
+      total === null ||
+      overOdds === null ||
+      underOdds === null
+    ) {
       continue;
     }
 
@@ -111,13 +141,19 @@ export function parseNflverseGames(
 
     lines.push({
       externalId: externalId(season, week, away, home),
-      // THE SIGN FLIPS HERE. nflverse documents spread_line as "a positive
-      // number means the home team was favored"; `games.spread` is the
-      // opposite. Verified against 544 completed 2024-25 games: home teams won
-      // 68.7% of those with a positive spread_line, which is the favourite win
-      // rate. Drop this negation and every spread pick grades backwards while
-      // looking entirely normal.
-      spread: -spread,
+      // NO SIGN FLIP, and that is the point. The spread this replaced needed
+      // one: nflverse documents spread_line as "a positive number means the
+      // home team was favored" while `games.spread` meant the opposite, so a
+      // missing negation graded every spread pick backwards while looking
+      // entirely normal. A moneyline carries no such convention — each column
+      // is that team's own American price, negative when it is favoured, in
+      // the same form the card prints. Read the two columns, keep the signs.
+      //
+      // Cross-checked on the 2026 Week 2 slate: the cheaper moneyline names
+      // the same favourite as the spread on all 16 games, so the columns are
+      // not transposed.
+      moneylineHome,
+      moneylineAway,
       total,
       overOdds,
       underOdds,

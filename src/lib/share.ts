@@ -1,14 +1,14 @@
 import { SHARE_DOMAIN } from "@/lib/constants";
-import { formatTotal, kickoffWindow, lineFor } from "@/lib/format";
+import { formatTotal, kickoffWindow, priceFor } from "@/lib/format";
 import type { PickMap } from "@/lib/picks";
 import type { Game } from "@/lib/week";
 
 /**
  * Pre-lock picks share. One self-explanatory line per game, real numbers
- * included — "DAL @ NYG — NYG +3.5 · Over 45.5" — because a first-time
+ * included — "IND @ KC — KC -305 · Over 47.5" — because a first-time
  * recipient in a group chat has to get the stakes without ever having seen
  * the product. The cryptic Wordle-grid form the spec sketched assumed the
- * recipient already knew the game; a line they can argue with ("BUF -9.5??")
+ * recipient already knew the game; a line they can argue with ("MIA +625??")
  * is what makes them reply, and the reply is the growth loop.
  *
  * Games stay in kickoff order so two people comparing slates are reading the
@@ -35,15 +35,15 @@ export function buildPicksShare(
 }
 
 function gameLine(game: Game, pick: PickMap[string] | undefined): string {
-  const spread =
-    pick?.spread != null
-      ? `${pick.spread} ${lineFor(game.spread, pick.spread === game.home_team ? "home" : "away")}`
+  const moneyline =
+    pick?.moneyline != null
+      ? `${pick.moneyline} ${priceFor(game, pick.moneyline === game.home_team ? "home" : "away")}`
       : "—";
   const total =
     pick?.total != null
       ? `${pick.total === "OVER" ? "Over" : "Under"} ${formatTotal(game.total)}`
       : "—";
-  return `${game.away_team} @ ${game.home_team} — ${spread} · ${total}`;
+  return `${game.away_team} @ ${game.home_team} — ${moneyline} · ${total}`;
 }
 
 /**
@@ -79,10 +79,15 @@ function square(grade: Grade): string {
  *
  * Unlike the picks share, this one stays a grid: green and red squares carry
  * their own drama and need no explanation. Eight per line so it never wraps
- * on a narrow phone, over/under block first, spread second, games in kickoff
- * order. That ordering is the feature. Two people comparing grids are looking
- * at the same game in the same position, which is what makes "which one did
- * you miss?" work at all.
+ * on a narrow phone, over/under block first, moneyline second, games in
+ * kickoff order. That ordering is the feature. Two people comparing grids are
+ * looking at the same game in the same position, which is what makes "which
+ * one did you miss?" work at all.
+ *
+ * SPEC §7 sketched the grid moneyline-first. The blocks are ordered the other
+ * way here so that the share, the deck, the summary rows and the glance strip
+ * all read top-to-bottom in one order; which block leads matters far less than
+ * all four agreeing, and the label under each block says which it is.
  *
  * The tally line carries the story rather than just the number. "29/32" is a
  * score; "29/32 — busted in the 4:25" is the thing someone sends to a group
@@ -91,18 +96,18 @@ function square(grade: Grade): string {
 export function buildResultsShare(input: {
   weekNumber: number;
   totals: Grade[];
-  spreads: Grade[];
+  moneylines: Grade[];
   correct: number;
   possible: number;
   clause: string;
 }): string {
-  const { weekNumber, totals, spreads, correct, possible, clause } = input;
+  const { weekNumber, totals, moneylines, correct, possible, clause } = input;
   return [
     `Perfect Sunday — Week ${weekNumber}`,
     ...chunk(totals.map(square), 8, ""),
     "over/under",
-    ...chunk(spreads.map(square), 8, ""),
-    "spread",
+    ...chunk(moneylines.map(square), 8, ""),
+    "moneyline",
     `${correct}/${possible} — ${clause}`,
     SHARE_DOMAIN,
   ].join("\n");
@@ -119,12 +124,12 @@ export function buildResultsShare(input: {
 export function resultClause(input: {
   kickoffs: string[];
   totals: Grade[];
-  spreads: Grade[];
+  moneylines: Grade[];
 }): string {
-  const { kickoffs, totals, spreads } = input;
+  const { kickoffs, totals, moneylines } = input;
 
   const firstMiss = kickoffs.findIndex(
-    (_, i) => totals[i] === false || spreads[i] === false,
+    (_, i) => totals[i] === false || moneylines[i] === false,
   );
   if (firstMiss !== -1) {
     const when = kickoffWindow(kickoffs[firstMiss]);
@@ -133,7 +138,7 @@ export function resultClause(input: {
     return when.startsWith("the ") ? `busted in ${when}` : `busted ${when}`;
   }
 
-  const pending = totals.some((g) => g === null) || spreads.some((g) => g === null);
+  const pending = totals.some((g) => g === null) || moneylines.some((g) => g === null);
   return pending ? "still alive" : "a perfect week";
 }
 

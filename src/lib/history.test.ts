@@ -19,7 +19,8 @@ function game(over: Partial<Game> & { id: string }): Game {
     home_team: "SEA",
     away_team: "NE",
     kickoff_at: "2026-09-10T00:20:00Z",
-    spread: -3.5,
+    moneyline_home: -180,
+    moneyline_away: 155,
     total: 44.5,
     over_odds: -110,
     under_odds: -110,
@@ -38,9 +39,9 @@ function row(
   return {
     game_id: gameOver.id,
     total_pick: "OVER",
-    spread_pick: "SEA",
+    moneyline_pick: "SEA",
     total_correct: null,
-    spread_correct: null,
+    moneyline_correct: null,
     ...pick,
     games: { ...game(gameOver), weeks: week(weekOver) },
   };
@@ -67,9 +68,9 @@ describe("toHistoryWeeks", () => {
       [
         row({ id: "a" }, { id: 3 }, {
           total_pick: "UNDER",
-          spread_pick: "NE",
+          moneyline_pick: "NE",
           total_correct: true,
-          spread_correct: false,
+          moneyline_correct: false,
         }),
       ],
       NOW,
@@ -77,9 +78,9 @@ describe("toHistoryWeeks", () => {
 
     expect(entry.results.a).toEqual({
       total: "UNDER",
-      spread: "NE",
+      moneyline: "NE",
       totalCorrect: true,
-      spreadCorrect: false,
+      moneylineCorrect: false,
     });
   });
 
@@ -164,9 +165,9 @@ describe("toHistoryWeeks", () => {
     const orphanGame: RawHistoryPick = {
       game_id: "a",
       total_pick: "OVER",
-      spread_pick: "SEA",
+      moneyline_pick: "SEA",
       total_correct: null,
-      spread_correct: null,
+      moneyline_correct: null,
       games: null,
     };
     const orphanWeek: RawHistoryPick = {

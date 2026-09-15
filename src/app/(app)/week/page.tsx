@@ -67,7 +67,7 @@ export default function MyWeek() {
   // compare them row by row. Built from `games` so they cannot drift apart.
   const kickoffs = games.map((g) => g.kickoff_at);
   const totals = games.map((g) => results[g.id]?.totalCorrect ?? null);
-  const spreads = games.map((g) => results[g.id]?.spreadCorrect ?? null);
+  const moneylines = games.map((g) => results[g.id]?.moneylineCorrect ?? null);
 
   // Before lock there is nothing graded to show, so the share is the picks
   // themselves; from lock onward it is the results grid, which is the share the
@@ -79,10 +79,10 @@ export default function MyWeek() {
       ? buildResultsShare({
           weekNumber: week.week_number,
           totals,
-          spreads,
-          correct: [...totals, ...spreads].filter((g) => g === true).length,
+          moneylines,
+          correct: [...totals, ...moneylines].filter((g) => g === true).length,
           possible: games.length * 2,
-          clause: resultClause({ kickoffs, totals, spreads }),
+          clause: resultClause({ kickoffs, totals, moneylines }),
         })
       : buildPicksShare(week.week_number, games, results);
 
@@ -117,10 +117,13 @@ export default function MyWeek() {
               key={game.id}
               game={game}
               pick={result}
-              team={result?.spread ? teams[result.spread] : undefined}
+              team={result?.moneyline ? teams[result.moneyline] : undefined}
               grade={
                 result
-                  ? { total: result.totalCorrect, spread: result.spreadCorrect }
+                  ? {
+                      total: result.totalCorrect,
+                      moneyline: result.moneylineCorrect,
+                    }
                   : undefined
               }
               score={

@@ -10,7 +10,7 @@ export type PipState = "empty" | "picked" | "correct" | "wrong";
 
 export type Glance = {
   totals: PipState[];
-  spreads: PipState[];
+  moneylines: PipState[];
   /** Individual picks made, out of two per game. */
   picked: number;
   possible: number;
@@ -40,19 +40,19 @@ function pip(choice: string | null, correct: boolean | null): PipState {
  */
 export function buildGlance(games: Game[], results: ResultMap): Glance {
   const totals: PipState[] = [];
-  const spreads: PipState[] = [];
+  const moneylines: PipState[] = [];
 
   for (const game of games) {
     const result = results[game.id];
     totals.push(pip(result?.total ?? null, result?.totalCorrect ?? null));
-    spreads.push(pip(result?.spread ?? null, result?.spreadCorrect ?? null));
+    moneylines.push(pip(result?.moneyline ?? null, result?.moneylineCorrect ?? null));
   }
 
-  const cells = [...totals, ...spreads];
+  const cells = [...totals, ...moneylines];
 
   return {
     totals,
-    spreads,
+    moneylines,
     picked: cells.filter((state) => state !== "empty").length,
     possible: games.length * 2,
     correct: cells.filter((state) => state === "correct").length,

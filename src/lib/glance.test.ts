@@ -9,7 +9,8 @@ function game(id: string): Game {
     home_team: "TB",
     away_team: "CAR",
     kickoff_at: "2026-09-13T17:00:00Z",
-    spread: -3.5,
+    moneyline_home: -180,
+    moneyline_away: 155,
     total: 44.5,
     over_odds: -110,
     under_odds: -110,
@@ -26,40 +27,40 @@ describe("buildGlance", () => {
     const glance = buildGlance([game("a")], {});
 
     expect(glance.totals).toEqual(["empty"]);
-    expect(glance.spreads).toEqual(["empty"]);
+    expect(glance.moneylines).toEqual(["empty"]);
   });
 
   it("shows an ungraded pick as picked rather than as an outcome", () => {
     const results: ResultMap = {
-      a: { total: "OVER", spread: "TB", totalCorrect: null, spreadCorrect: null },
+      a: { total: "OVER", moneyline: "TB", totalCorrect: null, moneylineCorrect: null },
     };
 
     const glance = buildGlance([game("a")], results);
 
     expect(glance.totals).toEqual(["picked"]);
-    expect(glance.spreads).toEqual(["picked"]);
+    expect(glance.moneylines).toEqual(["picked"]);
   });
 
   it("grades the two rows independently", () => {
     const results: ResultMap = {
-      a: { total: "OVER", spread: "TB", totalCorrect: true, spreadCorrect: false },
+      a: { total: "OVER", moneyline: "TB", totalCorrect: true, moneylineCorrect: false },
     };
 
     const glance = buildGlance([game("a")], results);
 
     expect(glance.totals).toEqual(["correct"]);
-    expect(glance.spreads).toEqual(["wrong"]);
+    expect(glance.moneylines).toEqual(["wrong"]);
   });
 
   it("leaves the unpicked side of a half-finished game empty", () => {
     const results: ResultMap = {
-      a: { total: "UNDER", spread: null, totalCorrect: null, spreadCorrect: null },
+      a: { total: "UNDER", moneyline: null, totalCorrect: null, moneylineCorrect: null },
     };
 
     const glance = buildGlance([game("a")], results);
 
     expect(glance.totals).toEqual(["picked"]);
-    expect(glance.spreads).toEqual(["empty"]);
+    expect(glance.moneylines).toEqual(["empty"]);
   });
 
   // A grade against a side that was never picked cannot happen through the
@@ -67,7 +68,7 @@ describe("buildGlance", () => {
   // would be the worst thing this strip could say, so it stays empty.
   it("keeps an unpicked side empty even if a grade came back for it", () => {
     const results: ResultMap = {
-      a: { total: null, spread: "TB", totalCorrect: true, spreadCorrect: true },
+      a: { total: null, moneyline: "TB", totalCorrect: true, moneylineCorrect: true },
     };
 
     const glance = buildGlance([game("a")], results);
@@ -79,8 +80,8 @@ describe("buildGlance", () => {
   // it and with the shared grid, and all three are built from `games`.
   it("emits one pip per game in the order the games arrive", () => {
     const results: ResultMap = {
-      a: { total: "OVER", spread: null, totalCorrect: null, spreadCorrect: null },
-      c: { total: "UNDER", spread: null, totalCorrect: false, spreadCorrect: null },
+      a: { total: "OVER", moneyline: null, totalCorrect: null, moneylineCorrect: null },
+      c: { total: "UNDER", moneyline: null, totalCorrect: false, moneylineCorrect: null },
     };
 
     const glance = buildGlance(games, results);
@@ -90,8 +91,8 @@ describe("buildGlance", () => {
 
   it("counts every individual pick against two per game", () => {
     const results: ResultMap = {
-      a: { total: "OVER", spread: "TB", totalCorrect: null, spreadCorrect: null },
-      b: { total: "UNDER", spread: null, totalCorrect: null, spreadCorrect: null },
+      a: { total: "OVER", moneyline: "TB", totalCorrect: null, moneylineCorrect: null },
+      b: { total: "UNDER", moneyline: null, totalCorrect: null, moneylineCorrect: null },
     };
 
     const glance = buildGlance(games, results);
@@ -102,8 +103,8 @@ describe("buildGlance", () => {
 
   it("counts correct picks against what has actually been graded", () => {
     const results: ResultMap = {
-      a: { total: "OVER", spread: "TB", totalCorrect: true, spreadCorrect: false },
-      b: { total: "UNDER", spread: "CAR", totalCorrect: true, spreadCorrect: null },
+      a: { total: "OVER", moneyline: "TB", totalCorrect: true, moneylineCorrect: false },
+      b: { total: "UNDER", moneyline: "CAR", totalCorrect: true, moneylineCorrect: null },
     };
 
     const glance = buildGlance(games, results);
@@ -117,7 +118,7 @@ describe("buildGlance", () => {
 
     expect(glance).toEqual({
       totals: [],
-      spreads: [],
+      moneylines: [],
       picked: 0,
       possible: 0,
       correct: 0,
@@ -134,9 +135,9 @@ describe("describePips", () => {
   });
 
   it("leaves out states with no pips", () => {
-    const text = describePips("Spreads", ["correct", "correct", "wrong"]);
+    const text = describePips("Moneylines", ["correct", "correct", "wrong"]);
 
-    expect(text).toBe("Spreads: 2 correct, 1 wrong");
+    expect(text).toBe("Moneylines: 2 correct, 1 wrong");
   });
 
   it("says so plainly when nothing has been picked", () => {

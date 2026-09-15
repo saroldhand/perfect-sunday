@@ -5,7 +5,7 @@ import {
   formatKickoff,
   formatOdds,
   formatTotal,
-  lineFor,
+  priceFor,
   statsProvenance,
 } from "@/lib/format";
 import type { Pick, TotalSide } from "@/lib/picks";
@@ -16,7 +16,7 @@ type Props = {
   teams: Record<string, Team>;
   pick?: Pick;
   onPickTotal: (side: TotalSide) => void;
-  onPickSpread: (team: string) => void;
+  onPickMoneyline: (team: string) => void;
   disabled: boolean;
 };
 
@@ -25,7 +25,7 @@ export function GameCard({
   teams,
   pick,
   onPickTotal,
-  onPickSpread,
+  onPickMoneyline,
   disabled,
 }: Props) {
   const away = teams[game.away_team];
@@ -55,7 +55,7 @@ export function GameCard({
       </p>
       <TeamBand team={home} />
 
-      {/* Total first, then spread — same order the share grid uses, so the
+      {/* Total first, then moneyline — same order the share grid uses, so the
           card and the grid agree about which block is which. */}
       <PickRow
         label="Total"
@@ -77,23 +77,25 @@ export function GameCard({
         disabled={disabled}
       />
 
+      {/* Each side carries its own American price, so both are shown: -305
+          and +245 only mean anything next to each other. */}
       <PickRow
-        label="Spread"
-        hint="Who covers"
+        label="Moneyline"
+        hint={game.moneyline_home === null ? "No line" : "Who wins"}
         options={[
           {
             value: game.away_team,
             label: game.away_team,
-            detail: lineFor(game.spread, "away"),
+            detail: priceFor(game, "away"),
           },
           {
             value: game.home_team,
             label: game.home_team,
-            detail: lineFor(game.spread, "home"),
+            detail: priceFor(game, "home"),
           },
         ]}
-        selected={pick?.spread ?? null}
-        onSelect={onPickSpread}
+        selected={pick?.moneyline ?? null}
+        onSelect={onPickMoneyline}
         disabled={disabled}
       />
     </article>

@@ -7,10 +7,11 @@ export type TotalSide = "OVER" | "UNDER";
 export type PickRow = {
   game_id: string;
   total_pick: string | null;
-  spread_pick: string | null;
+  moneyline_pick: string | null;
 };
 
-export type Pick = { total: TotalSide | null; spread: string | null };
+/** `moneyline` is the team backed to win outright — a club abbreviation. */
+export type Pick = { total: TotalSide | null; moneyline: string | null };
 export type PickMap = Record<string, Pick>;
 
 export async function getPicks(userId: string, gameIds: string[]): Promise<PickMap> {
@@ -18,7 +19,7 @@ export async function getPicks(userId: string, gameIds: string[]): Promise<PickM
 
   const { data, error } = await supabase
     .from("picks")
-    .select("game_id, total_pick, spread_pick")
+    .select("game_id, total_pick, moneyline_pick")
     .eq("user_id", userId)
     .in("game_id", gameIds);
 
@@ -28,7 +29,7 @@ export async function getPicks(userId: string, gameIds: string[]): Promise<PickM
   for (const row of (data ?? []) as PickRow[]) {
     map[row.game_id] = {
       total: (row.total_pick as TotalSide | null) ?? null,
-      spread: row.spread_pick,
+      moneyline: row.moneyline_pick,
     };
   }
   return map;
@@ -44,13 +45,13 @@ const inFlight = new Map<string, Promise<unknown>>();
  * Deliberately not a PostgREST upsert. Upsert emits
  * `ON CONFLICT DO UPDATE SET user_id = ..., game_id = ...` for every column in
  * the payload, and `authenticated` holds UPDATE on only total_pick and
- * spread_pick — that grant is what stops a user marking their own picks
+ * moneyline_pick — that grant is what stops a user marking their own picks
  * correct. Update-then-insert works within it.
  */
 export function savePick(
   userId: string,
   gameId: string,
-  patch: { total_pick?: TotalSide; spread_pick?: string },
+  patch: { total_pick?: TotalSide; moneyline_pick?: string },
 ): Promise<void> {
   const run = (inFlight.get(gameId) ?? Promise.resolve()).then(async () => {
     const updated = await supabase
@@ -89,7 +90,7 @@ export function savePick(
 
 /** A game counts as done only when both of its picks are in. */
 export function isGameComplete(pick?: Pick) {
-  return Boolean(pick?.total && pick?.spread);
+  return Boolean(pick?.total && pick?.moneyline);
 }
 
 export function countCompleted(picks: PickMap, gameIds: string[]) {
@@ -99,21 +100,21 @@ export function countCompleted(picks: PickMap, gameIds: string[]) {
 /** A pick plus how it graded. Null grade means not graded yet — never wrong. */
 export type Result = Pick & {
   totalCorrect: boolean | null;
-  spreadCorrect: boolean | null;
+  moneylineCorrect: boolean | null;
 };
 
 export type ResultMap = Record<string, Result>;
 
 type ResultRow = PickRow & {
   total_correct: boolean | null;
-  spread_correct: boolean | null;
+  moneyline_correct: boolean | null;
 };
 
 /**
  * Own picks with their grades, for My Week and the hub.
  *
  * Reading the grading columns is allowed and always has been — RLS and the
- * column grant restrict who may *write* total_correct and spread_correct,
+ * column grant restrict who may *write* total_correct and moneyline_correct,
  * never who may read their own. getPicks stays grade-free on purpose: the
  * deck is the one screen that must never show them.
  */
@@ -125,7 +126,7 @@ export async function getResults(
 
   const { data, error } = await supabase
     .from("picks")
-    .select("game_id, total_pick, spread_pick, total_correct, spread_correct")
+    .select("game_id, total_pick, moneyline_pick, total_correct, moneyline_correct")
     .eq("user_id", userId)
     .in("game_id", gameIds);
 
@@ -135,9 +136,9 @@ export async function getResults(
   for (const row of (data ?? []) as ResultRow[]) {
     map[row.game_id] = {
       total: (row.total_pick as TotalSide | null) ?? null,
-      spread: row.spread_pick,
+      moneyline: row.moneyline_pick,
       totalCorrect: row.total_correct,
-      spreadCorrect: row.spread_correct,
+      moneylineCorrect: row.moneyline_correct,
     };
   }
   return map;
@@ -155,13 +156,13 @@ export async function getResults(
  */
 export async function getHistoryPicks(userId: string): Promise<RawHistoryPick[]> {
   const games =
-    "id, home_team, away_team, kickoff_at, spread, total, over_odds, under_odds, home_score, away_score, status";
+    "id, home_team, away_team, kickoff_at, moneyline_home, moneyline_away, total, over_odds, under_odds, home_score, away_score, status";
   const weeks = "id, season, week_number, locks_at, status";
 
   const { data, error } = await supabase
     .from("picks")
     .select(
-      `game_id, total_pick, spread_pick, total_correct, spread_correct, games!inner(${games}, weeks!inner(${weeks}))`,
+      `game_id, total_pick, moneyline_pick, total_correct, moneyline_correct, games!inner(${games}, weeks!inner(${weeks}))`,
     )
     .eq("user_id", userId);
 

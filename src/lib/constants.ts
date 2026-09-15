@@ -2,7 +2,12 @@
 // change mid-season we need to know who agreed to what, and a boolean cannot
 // tell us. Bump this when the rules change; the app re-prompts anyone whose
 // stored version is older.
-export const TERMS_VERSION = "2026-08-21";
+//
+// 2026-09-15: the spread layer became a moneyline layer, which changes both
+// how to enter and how a winner is determined — the two sections most likely
+// to matter to someone who already accepted. Everyone is re-prompted, which is
+// the point of storing a version rather than a boolean. See migration 0019.
+export const TERMS_VERSION = "2026-09-15";
 
 // No custom domain yet, so shares carry the Pages URL. One constant, so buying
 // a domain is a one-line change.

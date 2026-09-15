@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import { absoluteUrl } from "@/lib/urls";
 import { GOOGLE_AUTH_ENABLED } from "@/lib/constants";
 import { useWeek } from "@/components/app/WeekProvider";
-import { formatTotal, lineFor } from "@/lib/format";
+import { formatTotal, priceFor } from "@/lib/format";
 
 type SendState =
   | { status: "idle" }
@@ -68,7 +68,7 @@ export function SignInForm() {
       </h1>
 
       <p className="rise rise-2 mt-5 text-sm leading-relaxed text-[var(--color-text-muted)]">
-        Pick every over/under and every spread on the slate. Get them all right
+        Pick every over/under and every winner on the slate. Get them all right
         and win the prize.{" "}
         <span className="font-semibold whitespace-nowrap text-[var(--color-accent)]">
           Nobody will.
@@ -151,11 +151,14 @@ export function SignInForm() {
 function LineTicker() {
   const { games } = useWeek();
   const items = games
-    .filter((g) => g.spread !== null || g.total !== null)
+    .filter((g) => g.moneyline_home !== null || g.total !== null)
     .map((g) => ({
       id: g.id,
       matchup: `${g.away_team} @ ${g.home_team}`,
-      line: g.spread !== null ? `${g.home_team} ${lineFor(g.spread, "home")}` : null,
+      line:
+        g.moneyline_home !== null
+          ? `${g.home_team} ${priceFor(g, "home")}`
+          : null,
       total: g.total !== null ? `O/U ${formatTotal(g.total)}` : null,
     }));
 

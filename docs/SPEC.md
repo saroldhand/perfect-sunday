@@ -1,6 +1,6 @@
 # Perfect Sunday — Build Spec
 
-A free-to-play NFL pick'em game. Every week you pick the **moneyline** and the **spread** for every game on the slate. Get all of them right and you win the prize. Nobody will.
+A free-to-play NFL pick'em game. Every week you pick the **over/under** and the **moneyline** for every game on the slate. Get all of them right and you win the prize. Nobody will.
 
 This document is the handoff brief for implementation. It covers the concept, the math behind the prize, the stack, the data model, the scoring pipeline, the screens, the visual direction, and the build order.
 
@@ -11,9 +11,9 @@ This document is the handoff brief for implementation. It covers the concept, th
 - Free to enter, no payment, no deposit, no wagering.
 - Each NFL week, the user must pick **every game on the slate**. Partial entries are blocked — an entry is not submitted, scored, or ranked unless all 32 picks are in before lock. Picks still autosave as they're made, so a user can come back across several sessions, but an incomplete set at Thursday 4PM ET simply doesn't count for that week.
 - Two picks per game:
+  - **Over/under** — whether the combined score goes over or under the posted total.
   - **Moneyline** — which team wins outright.
-  - **Spread** — which team covers.
-- A perfect week (all moneylines + all spreads correct) wins the prize, initially $1,000, fronted by the operators.
+- A perfect week (all over/unders + all moneylines correct) wins the prize, initially $1,000, fronted by the operators.
 - Season-long leaderboard tracks cumulative correct picks so people who bust in Week 1 still have a reason to come back.
 
 The engagement model is Beat the Streak (MLB): the jackpot is functionally unwinnable, but the near-miss is the product. "You had 29 of 32 going into Sunday night" is the thing people screenshot and send to their group chat.
@@ -29,15 +29,26 @@ A typical NFL week has ~16 games, so a full entry is **32 picks**.
 | Spread only | 50% (coin flip) | ~1 in 65,536 |
 | Spread only | 53% (sharp bettor) | ~1 in 25,800 |
 | Moneyline only | 66% (favorites win outright) | ~1 in 771 |
-| **Moneyline + spread** | **66% / 53%** | **~1 in 19,900,000** |
+| **Over/under + moneyline** | **53% / 66%** | **~1 in 19,900,000** |
+| Moneyline + spread | 66% / 53% | ~1 in 19,900,000 |
 | Spread + over/under | 53% / 53% | ~1 in 665,500,000 |
 
-**Moneyline + spread is the chosen format.** Reasoning:
+**Over/under + moneyline is the chosen format.** Reasoning:
 
 - Moneyline picks feel *winnable* — most users will get 12–14 of 16 right, which is psychologically rewarding and keeps them engaged.
-- The spread layer is what makes it hard, and it's the layer that produces heartbreak near-misses.
+- The over/under layer is what makes it hard, and it's the layer that produces heartbreak near-misses.
 - ~1 in 20 million per entry means even at 10,000 weekly entries across an 18-week season, expected payouts are under $10. The prize is safe.
-- Over/unders were considered and rejected: they push odds to ~1 in 665 million, which is *needlessly* unwinnable and makes the game feel like a lottery rather than a skill contest. They also double the tap count per game, which hurts completion rate.
+- A format pairing the two 53% layers was rejected: it pushes odds to ~1 in 665 million, which is *needlessly* unwinnable and makes the game feel like a lottery rather than a skill contest.
+
+*(Amended 2026-09-15. The original choice was moneyline + spread, and the two
+rows above are deliberately both shown because they are the same difficulty —
+the odds depend on the pair of hit rates, not on which layers carry them.
+Migration 0007 replaced the moneyline with an over/under in August without
+amending this section, which left the live product on spread + over/under, the
+one combination the last bullet rejects, for three weeks. Migration 0019 swaps
+the spread for the moneyline and puts the risk back where this section had it.
+The over/under is kept rather than the spread because it was already built,
+already labelled with its provenance, and identical in difficulty.)*
 
 Keep these constants configurable so the prize can be raised later without a code change.
 
@@ -49,10 +60,10 @@ Keep these constants configurable so the prize can be raised later without a cod
 
 - **Frontend:** Next.js (App Router) + TypeScript + Tailwind + shadcn/ui
 - **Backend / DB / Auth:** Supabase (Postgres, Auth, Row Level Security, Edge Functions)
-- **Hosting:** Vercel
-- **Odds + scores feed:** **FanDuel lines**, pulled just after midnight ET once Monday Night Football is final. FanDuel does not publish a public odds API, so source these through an aggregator that carries FanDuel as a named bookmaker — The Odds API exposes a `bookmakers=fanduel` filter and is the recommended route. Abstract the whole thing behind a single `lib/oddsProvider.ts` module so the aggregator can be swapped without touching the rest of the app.
+- **Hosting:** GitHub Pages, static export. *(Amended 2026-09-15; the spec said Vercel. The Phase 1 decision is in `docs/superpowers/specs/2026-08-21-github-pages-deployment-design.md`, and it constrains the whole app: `output: 'export'`, so no middleware, no route handlers, no server actions.)*
+- **Odds + scores feed:** lines pulled just after midnight ET once Monday Night Football is final, behind a single `oddsProvider.ts` module so the source can be swapped without touching the rest of the app. *(Amended 2026-09-15; the spec specified FanDuel via an aggregator. Built 2026-08-24 against nflverse instead — no major book publishes a public odds API, and nflverse's numbers are a consensus market line attributed to no book. They are labelled `nflverse-consensus`, not `fanduel`, precisely because of the rule below.)*
 
-Store which book the line came from on the `games` row. If FanDuel is unavailable for a given game, do **not** silently substitute another book — an entry graded against a line the user never saw is the worst possible failure mode here.
+Store where the line came from on the `games` row, and never silently substitute a different source under an existing label — an entry graded against a line the user never saw is the worst possible failure mode here.
 
 Mobile is the primary target — most picks will be made on a phone. Build mobile-first; desktop is the secondary layout, not the other way around. A native iOS app is a later phase, so keep business logic in Supabase (RPC functions / Edge Functions) rather than in the Next.js layer where possible.
 
@@ -116,16 +127,20 @@ Controls the entry window. Do not derive this from game times — it needs to be
 | `home_team` | text | Team abbreviation, e.g. `CIN` |
 | `away_team` | text | |
 | `kickoff_at` | timestamptz | |
-| `spread` | numeric | Home team's line, e.g. `-3.5`. Negative = home favored |
-| `moneyline_home` | int | American odds |
-| `moneyline_away` | int | |
+| `total` | numeric | The posted over/under, e.g. `44.5` |
+| `over_odds` | int | American odds on the over |
+| `under_odds` | int | American odds on the under |
+| `moneyline_home` | int | American odds on the home team winning outright, e.g. `-218` |
+| `moneyline_away` | int | e.g. `+180` |
 | `home_score` | int | Nullable until final |
 | `away_score` | int | Nullable until final |
 | `status` | enum | `scheduled` / `in_progress` / `final` |
 
-**Lock the spread at week open.** Once `weeks.status` flips to `locked`, `spread` must never be rewritten by the feed, or you'll retroactively change what people picked against.
+**Lock the line at week open.** Once `weeks.status` flips to `locked`, `total` must never be rewritten by the feed, or you'll retroactively change what people picked against. `private.apply_week_lines` enforces this; see `supabase/tests/lines.sql`.
 
-Use half-point spreads wherever the provider offers them to avoid pushes. If a whole-number spread produces a push, count it as **correct** for the user — generous, and it avoids arguments.
+Use half-point totals wherever the provider offers them to avoid pushes. If a whole-number total produces a push, count it as **correct** for the user — generous, and it avoids arguments. The moneyline's only push is a tied game, which counts correct for both sides for the same reason.
+
+A moneyline is two independent prices, not one number with a sign convention, so **both columns are required** for a game to count as priced — `private.line_complete` is the single place that rule lives. The prices are display only: who won does not depend on what the win paid, so scoring never reads them.
 
 ### `picks`
 One row per user per game.
@@ -135,10 +150,10 @@ One row per user per game.
 | `id` | uuid PK | |
 | `user_id` | uuid | FK → `profiles.id` |
 | `game_id` | uuid | FK → `games.id` |
+| `total_pick` | text | `OVER` or `UNDER` |
 | `moneyline_pick` | text | Team abbreviation |
-| `spread_pick` | text | Team abbreviation |
+| `total_correct` | boolean | Null until scored |
 | `moneyline_correct` | boolean | Null until scored |
-| `spread_correct` | boolean | Null until scored |
 | `created_at` / `updated_at` | timestamptz | |
 
 Unique constraint on `(user_id, game_id)`.
@@ -182,15 +197,15 @@ Sort order: total correct descending, then **weeks played descending** as the ti
 
 Three scheduled Supabase Edge Functions:
 
-1. **`sync-slate`** — runs at 12:00 AM ET Tuesday, after Monday Night Football goes final. Pulls the upcoming week's games, FanDuel spreads, and FanDuel moneylines. Creates the `weeks` row and `games` rows. Sets week status to `open` **only if every game on the slate has a complete line**.
+1. **`sync-slate`** — runs at 12:00 AM ET Tuesday, after Monday Night Football goes final. Pulls the upcoming week's games, totals, and moneylines. Creates the `weeks` row and `games` rows. Sets week status to `open` **only if every game on the slate has a complete line**. (Built 2026-08-24 against nflverse, not FanDuel: no major book publishes a public odds API, so the numbers are a consensus market line and `line_source` says so.)
 
    FanDuel often doesn't post full Week N+1 numbers the instant MNF ends, so this will sometimes come back short. Handle it: retry hourly until the slate is complete, and leave the week in `upcoming` until it is. Never open a week with partial lines and never publish a placeholder number — a line that changes after someone picks against it is a broken promise.
 
 2. **`lock-week`** — runs Thursday at 4:00 PM ET. Flips week status to `locked`. Freezes lines. Creates `entries` rows **only for users with a complete set of 32 picks**. Incomplete pickers get no entry row and don't appear on that week's leaderboard at all; their orphaned `picks` rows stay in the table for their own history view but are never scored.
 
 3. **`score-games`** — runs every 10 minutes from first kickoff through Monday night. For each game now `final`:
-   - Set `moneyline_correct` — did the picked team win outright. Ties: both picks count correct.
-   - Set `spread_correct` — apply `spread` to the home score, compare. Pushes count correct.
+   - Set `total_correct` — compare the combined score to `total`. A combined score landing exactly on the number counts correct for both sides.
+   - Set `moneyline_correct` — did the picked team win outright. Ties: both picks count correct. Check that a pick was actually made *before* applying the tie rule, or a drawn game credits a pick nobody made.
    - Recompute affected `entries`: bump `correct_count`, set `is_alive = false` on any miss.
    - When every game in the week is final: set `is_perfect`, flip week to `scored`, refresh `season_standings`.
 
@@ -213,8 +228,8 @@ Winner detection is a flag, not an automatic payout. If `is_perfect` is ever tru
 
 Below the two bands, two rows of tap targets:
 
-- **Moneyline** — pick the winner. Show each side's American odds.
-- **Spread** — pick who covers. Show each side's line, e.g. `CIN -3.5` / `BAL +3.5`.
+- **Over/under** — pick a side of the total. Show the number and each side's American odds, e.g. `Over 44.5 -110` / `Under 44.5 -110`.
+- **Moneyline** — pick the winner. Show each side's American odds, e.g. `CIN -218` / `BAL +180`. Both sides, always: one price alone doesn't tell you the shape of the game.
 
 Present the stats flat, with no highlighting of which team is "better." Any visual nudge toward a side is the app making the pick, and users will notice and resent it when it's wrong.
 
@@ -271,14 +286,16 @@ Results share:
 ```
 Perfect Sunday — Week 3
 🟩🟩🟩🟩🟥🟩🟩🟩
-🟩🟩🟩🟩🟩🟩🟩🟩  moneyline
+🟩🟩🟩🟩🟩🟩🟩🟩  over/under
 🟩🟩🟥🟩🟩🟩🟩🟩
-🟩🟩🟩🟩🟩🟥🟩🟩  spread
+🟩🟩🟩🟩🟩🟥🟩🟩  moneyline
 29/32 — busted in the 4:25
 perfectsunday.app
 ```
 
-Rules for the grid: eight squares per line so it never wraps on a narrow phone. Moneyline block first, spread block second. Games in kickoff order, so two people comparing grids are looking at the same games in the same positions — that's what makes "which one did you miss?" work. Use ⬜ for games not yet played so a mid-Sunday share still reads correctly.
+Rules for the grid: eight squares per line so it never wraps on a narrow phone. Over/under block first, moneyline block second. Games in kickoff order, so two people comparing grids are looking at the same games in the same positions — that's what makes "which one did you miss?" work. Use ⬜ for games not yet played so a mid-Sunday share still reads correctly.
+
+*(Amended 2026-09-15: the blocks were specified moneyline-first. The card, the summary rows, the at-a-glance strip and this grid are all built over/under-first, and four views agreeing matters more than which block leads — so the spec follows the build here. The label under each block is what actually tells a reader which is which.)*
 
 Picks share (pre-lock) is different: it is *not* the grid. A results grid is self-evident — green and red squares carry their own drama — but a pre-lock grid of team abbreviations means nothing to a first-time recipient, and the picks share is the one most likely to land in front of someone who has never played. It reads as one plain line per game with the real numbers, framed by the stakes, so every line is something a recipient can argue with — and the argument is the growth loop. *(Amended 2026-08-25; the original spec had the picks share reuse the grid shape.)*
 
@@ -287,8 +304,8 @@ Perfect Sunday — Week 3
 My 32 picks. Every one has to hit.
 Perfect week wins $1,000.
 
-DAL @ NYG — NYG +3.5 · Over 45.5
-NYJ @ BUF — BUF -9.5 · Under 38.5
+DAL @ NYG — NYG +155 · Over 45.5
+NYJ @ BUF — BUF -450 · Under 38.5
 …one line per game, kickoff order…
 
 Fade me or beat me. Free to play:

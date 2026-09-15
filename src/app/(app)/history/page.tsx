@@ -199,10 +199,13 @@ function WeekCard({
                 key={game.id}
                 game={game}
                 pick={result}
-                team={result?.spread ? teams[result.spread] : undefined}
+                team={result?.moneyline ? teams[result.moneyline] : undefined}
                 grade={
                   result
-                    ? { total: result.totalCorrect, spread: result.spreadCorrect }
+                    ? {
+                        total: result.totalCorrect,
+                        moneyline: result.moneylineCorrect,
+                      }
                     : undefined
                 }
                 score={

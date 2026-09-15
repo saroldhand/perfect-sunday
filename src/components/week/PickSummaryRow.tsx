@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { accentColor } from "@/lib/teamColor";
-import { lineFor, formatKickoff, formatTotal } from "@/lib/format";
+import { priceFor, formatKickoff, formatTotal } from "@/lib/format";
 import type { Pick } from "@/lib/picks";
 import type { Game, Team } from "@/lib/week";
 
-export type Grade = { total: boolean | null; spread: boolean | null };
+export type Grade = { total: boolean | null; moneyline: boolean | null };
 export type Score = {
   home: number | null;
   away: number | null;
@@ -18,8 +18,8 @@ export type Score = {
 type Props = {
   game: Game;
   pick: Pick | undefined;
-  /** The club backed on the spread. Supplies the row's colour; omitted before
-   *  a spread is picked, which is what makes an untouched row read as blank. */
+  /** The club backed on the moneyline. Supplies the row's colour; omitted
+   *  before one is picked, which is what makes an untouched row read blank. */
   team?: Team;
   /** Omitted before scoring. A null field means that side is not graded yet. */
   grade?: Grade;
@@ -58,8 +58,8 @@ export function PickSummaryRow({ game, pick, team, grade, score, onJump }: Props
         </span>
       </div>
 
-      {/* Total first, then spread — the order the card and the share grid both
-          use, so all three agree about which block is which. */}
+      {/* Total first, then moneyline — the order the card and the share grid
+          both use, so all three agree about which block is which. */}
       <div className="mt-2 flex gap-2">
         <PickChip
           label={pick?.total ? (pick.total === "OVER" ? "Over" : "Under") : "Total"}
@@ -68,14 +68,14 @@ export function PickSummaryRow({ game, pick, team, grade, score, onJump }: Props
           chosen={Boolean(pick?.total)}
         />
         <PickChip
-          label={pick?.spread ?? "Spread"}
+          label={pick?.moneyline ?? "Moneyline"}
           detail={
-            pick?.spread
-              ? lineFor(game.spread, pick.spread === game.home_team ? "home" : "away")
+            pick?.moneyline
+              ? priceFor(game, pick.moneyline === game.home_team ? "home" : "away")
               : undefined
           }
-          grade={grade?.spread}
-          chosen={Boolean(pick?.spread)}
+          grade={grade?.moneyline}
+          chosen={Boolean(pick?.moneyline)}
         />
       </div>
     </>
@@ -112,9 +112,9 @@ export function PickSummaryRow({ game, pick, team, grade, score, onJump }: Props
 /**
  * One side of one game.
  *
- * A push — a combined score landing exactly on the total, or a spread landing
- * exactly on the number — is recorded as correct for both sides. It reads as
- * correct here, not as a third state: inventing one would contradict both the
+ * A push — a combined score landing exactly on the total, or a tied game on
+ * the moneyline — is recorded as correct for both sides. It reads as correct
+ * here, not as a third state: inventing one would contradict both the
  * database and the rules page.
  */
 function PickChip({
