@@ -3,28 +3,69 @@
 Written 2026-09-15, the Tuesday after Week 1 ended. One-time runbook, unlike
 [OPERATIONS.md](OPERATIONS.md), which is the evergreen reference — every step
 here exists because the Supabase project was paused across the season opener
-and the database is nineteen days behind the repo. Delete this file once the
-last box is ticked.
+and the database had fallen five migrations behind the repo. Delete this file
+once the last box is ticked.
 
-**Nothing in here could be verified against production.** The session that
-wrote it had no route to the database: the pinned MCP server in `.mcp.json`
-runs `cmd /c`, which does not exist off Windows, and this session's egress
-policy denies `*.supabase.co`, so the REST fallback was refused too. Every
-step therefore starts by *reading* state rather than assuming it. Run the
-probes; if one disagrees with what is written here, trust the probe.
+**Status 2026-09-15: Steps 0, 1 and 3 are done and verified against production.**
+Migrations 0013-0017 were applied this session and checked; the remaining work
+is Step 2 (a decision, see below), Step 4 and Step 5. The original preamble
+said none of this could be verified, because the session that wrote it had no
+route to the database. That was resolved mid-session, and what the probes found
+was considerably worse than this document assumed — see **What was actually
+wrong** below.
+
+## What was actually wrong
+
+The database was not nineteen days behind the repo. It was at **migration
+0012** — five migrations back, not one:
+
+| | Expected | Found |
+|---|---|---|
+| Migrations applied | 0001-0016 | **0001-0012 only** |
+| Weeks in database | 18 (2026) + demo | **1** — the demo alone |
+| Games | 272 + 16 | **16** — the demo alone |
+| Edge Functions deployed | sync-slate | **none** |
+| pg_cron / pg_net | available | **not installed** |
+
+So the 2026 season was never loaded at all: Week 1 did not exist as a row, and
+neither did Week 2. That is the real reason Week 1 never happened — not that a
+job failed to fire, but that there was nothing for it to fire on.
+
+**And four people had already signed up and played the demo week.** Not just
+the operator: `Harry S`, `Baller` and `max` each have a complete 16-of-16 set
+against the 2025 demo slate, and `EK` picked one game and stopped, between 21
+and 26 August. That is real usage on a demo week, and it is why Step 2 below
+changed from a cleanup into a decision.
+
+### Applied this session, verified
+
+- 0013 — `teams.stats_season`, all 32 clubs labelled `(2025, 18)`. This also
+  silently fixed the live app: `getTeams` had been falling back past the
+  missing column on every load, so the cards had no stat line at all.
+- 0014 — `lock_due_weeks`, `score_due_weeks`.
+- 0015 — 18 weeks and 272 games for 2026. Verified by digest rather than by
+  eye: the `(week, external_id, away, home, kickoff)` tuples in the database
+  md5 to `45de3f545329d5dd02249de935cb9ce8` under C collation, identical to
+  the same digest computed from `0015_seed_2026_schedule.sql`, 272 rows both
+  sides.
+- 0016 — `apply_week_lines`, `next_week_needing_lines`, service-role wrappers.
+- 0017 — `apply_week_scores`, `next_week_needing_scores`, service-role
+  wrappers.
+
+Step 3's claim that Week 1 is inert is now confirmed by the live functions
+rather than argued from the source: `private.next_week_needing_lines()`
+returns **4**, which is 2026 Week 2, skipping Week 1 (id 3) on its own.
+`private.next_week_needing_scores()` returns null.
 
 ## Where the clock actually is
 
 | | |
 |---|---|
-| Week 1 locked | Wed 9 Sep, 7:50 PM ET — **past** |
-| Week 1 finished | Mon 14 Sep, 8:15 PM ET (MNF) — **past**, all 16 games |
-| **Week 2 locks** | **Thu 17 Sep, 4:00 PM ET** |
+| Week 1 locked | Wed 9 Sep, 7:50 PM ET — past (week id 3, no lines, no picks) |
+| Week 1 finished | Mon 14 Sep, 8:15 PM ET — all 16 games done |
+| Demo week locked | Thu 10 Sep, 4:00 PM ET — **past, and still `open`** |
+| **Week 2 locks** | **Thu 17 Sep, 4:00 PM ET** (week id 4) |
 | Week 2 first kickoff | Thu 17 Sep, 8:15 PM ET |
-
-So the deadline that matters is Thursday 4:00 PM ET. Week 2's lines have to be
-in and the week open before then, or Week 2 is lost the same way Week 1 was.
-Lines land on Tuesdays, which is today.
 
 ## Step 0 — read the state before changing any of it
 
@@ -81,43 +122,50 @@ group by w.week_number order by w.week_number;
 select jobname, schedule, active from cron.job;
 ```
 
-## Step 1 — apply whatever Step 0 says is missing
+## Step 1 — apply whatever Step 0 says is missing — DONE
 
-Run the migration files in `migrations/` in numeric order, skipping the ones
-already applied. `0017_sync_scores.sql` is the one known to be outstanding —
-the [TODO](../docs/TODO.md) has it unticked and nothing has run since.
+0013 through 0017 were applied this session, in order, and verified above.
+Nothing is outstanding.
 
-After 0017, run [tests/scores.sql](tests/scores.sql) in the editor and expect
-**21 of 21 PASS**. Run [tests/lines.sql](tests/lines.sql) and
-[tests/jobs.sql](tests/jobs.sql) too if Step 0 showed 0016 or 0014 missing.
+The suites in `tests/` were **not** run — each is `begin; … rollback;` so they
+are safe to run against production, but they seed their own fixture weeks and
+the session that applied the migrations left them for the operator. Worth doing
+once, in the SQL editor:
+[tests/scores.sql](tests/scores.sql) (expect 21 of 21 PASS),
+[tests/lines.sql](tests/lines.sql), [tests/jobs.sql](tests/jobs.sql).
 
-## Step 2 — retire the demo week
+## Step 2 — the demo week: a decision, not a cleanup
 
-This is the one that is actively breaking the live site right now.
-`selectCurrentWeek` prefers any `open` or `locked` week over everything else,
-and the 2025 Week 18 demo is still `open` — so the deployed app has been
-showing a 2025 demo slate through the whole opening week.
+**Blocked on the operator.** The 2025 Week 18 demo week is still `open`, its
+lock time passed on Thu 10 Sep, and it holds **49 picks from 4 real accounts**
+— three complete 16-of-16 sets. Deleting it, which is what this runbook said
+before the database could be read, would destroy other people's picks. That is
+not a cosmetic tidy-up and it is not reversible.
+
+Two consequences of leaving it as it is, both worth knowing:
+
+- Being `open` is what makes the live app show a 2025 demo slate today. But it
+  stops mattering the moment Week 2 opens: `selectCurrentWeek` takes the
+  **latest** `locks_at` among weeks in play, and Week 2 (Thu 17 Sep) is later
+  than the demo (Thu 10 Sep). So Step 4 fixes the visible symptom on its own.
+- It is still pickable, and once `lock-due-weeks` is scheduled (Step 5) the
+  job will lock it on its first tick — its `locks_at` is in the past — and
+  create entries for the three complete sets. Harmless but untidy, and it is
+  a reason to settle this before Step 5, not after.
+
+The options, least destructive first:
+
+| Option | Keeps the 49 picks | Board stays clean | Note |
+|---|---|---|---|
+| `status = 'upcoming'` | yes | yes | Inert everywhere, exactly like Week 1: every job filters on status or on `locks_at > now()`. Semantically odd for a past week, which is the same wart Week 1 carries. **Recommended.** |
+| Leave `open` | yes | yes | Needs nothing, but stays pickable and will be locked by the Step 5 cron. |
+| `status = 'scored'` | yes | **no** | `getLastScoredWeek` orders by season descending, so with no 2026 week scored the demo becomes the board's "most recent finished week" — and it has no entries, so the board shows an empty result. |
+| `delete` | **no** | yes | Cascades to its 16 games, 49 picks and entries. Cleanest state, destroys the only real usage data this product has. |
 
 ```sql
-delete from public.weeks where season = 2025 and week_number = 18;
-```
-
-**Delete rather than mark it `scored`**, which is the opposite of what
-OPERATIONS.md suggested before the season started, and the reason is
-`getLastScoredWeek`: it orders by season descending and takes the first
-`scored` week, so a `scored` 2025 demo becomes "the most recent finished week"
-and the board would show demo results to anyone who opens the app before Week 2
-locks. No 2026 week is scored yet to outrank it. Deleting cascades to the
-demo's games, picks and entries; the season table is unaffected either way,
-because `getSeasonEntries` filters on `weeks.season`.
-
-Verify the app now resolves to Week 2:
-
-```sql
--- Expect 2026 week 2 — the earliest upcoming week whose lock is still ahead.
-select season, week_number, status, locks_at from public.weeks
-where status = 'upcoming' and locks_at > now()
-order by locks_at limit 1;
+-- The recommended option. One row.
+update public.weeks set status = 'upcoming'
+where season = 2025 and week_number = 18;
 ```
 
 ## Step 3 — leave Week 1 alone, deliberately
@@ -234,25 +282,23 @@ Two checks that only the first live run can settle:
 
 ## The checklist
 
-- [ ] Step 0 probes run, output read
-- [ ] Missing migrations applied (0017 at minimum), `tests/scores.sql` 21/21
-- [ ] Demo week deleted; current-week probe returns 2026 week 2
-- [ ] Week 1 confirmed pick-free and left `upcoming`
+- [x] Step 0 probes run, output read
+- [x] Migrations applied — 0013, 0014, 0015, 0016, 0017; 0015 digest-verified
+- [ ] `tests/scores.sql` run in the SQL editor (21 of 21 PASS)
+- [ ] **Demo week decided** (Step 2) — blocked on the operator; 49 real picks
+- [x] Week 1 confirmed pick-free and left `upcoming`; live functions skip it
 - [ ] `sync-slate` and `sync-scores` deployed
 - [ ] Week 2 lines in, `missing: 0`, week `open` — **before Thu 4:00 PM ET**
-- [ ] Four cron jobs scheduled, `cron.job` shows them active
+- [ ] `pg_cron` + `pg_net` installed, four cron jobs scheduled and active
 - [ ] Thursday lock spot-checked; `sync-scores` watched once live
 
-Everything above is operator-side. The repo needs no changes for any of it:
-tests are 108/108 green, `tsc` and lint are clean, and `main` deployed
-successfully on 2026-08-27.
+The repo itself needs no changes for any of it: tests are 108/108 green, `tsc`
+and lint are clean, and `main` deployed successfully on 2026-08-27.
 
----
+## Appendix — the route to the database, and the boundary
 
-## Appendix — why this session could not run any of it
-
-Three separate routes to the database, all shut. Recorded because the next
-session will hit the same walls, and because one of them touches the Supabase
+Three routes, two shut and one that should not exist. Recorded because the next
+session will hit the same walls, and because the third touches the Supabase
 boundary in CLAUDE.md.
 
 1. **The pinned MCP server does not start off Windows.** `.mcp.json` runs
@@ -262,22 +308,23 @@ boundary in CLAUDE.md.
    layer 1 in CLAUDE.md is also *availability* layer 1, and on Linux there is
    no pinned server at all. Left unchanged deliberately: dropping the wrapper
    to a bare `npx` would likely fix Linux, and it is the operator's Windows
-   setup that would pay if it does not. Worth a deliberate test on Windows
-   before changing.
+   setup that would pay if it does not. Worth a deliberate test on Windows.
 2. **Egress policy denies `*.supabase.co`.** The REST fallback — publishable
    key against the one allowed project ref, which respects the boundary — was
    refused by the proxy with a 403 on CONNECT. Not retried; an organization
    policy denial is not something to route around.
-3. **An unpinned Supabase MCP server was present, and was not used.** Tools
-   appeared under `mcp__Supabase__*` — not the `mcp__supabase__*` the pin
-   produces — exposing `list_projects`, `create_project`, `pause_project` and
-   `restore_project`. That is the account-level connector CLAUDE.md names as
-   the known gap: unpinned, so redirectable at call time, and reachable from
-   this repo. CLAUDE.md's instruction for a Supabase tool under any other name
-   is to stop and report rather than use it, which is what happened.
+3. **An unpinned Supabase MCP server was present**, under `mcp__Supabase__*`
+   rather than the `mcp__supabase__*` the pin produces, exposing
+   `list_projects`, `create_project`, `pause_project` and `restore_project`.
+   That is the account-level connector CLAUDE.md names as the known gap:
+   unpinned, so redirectable at call time, and reachable from this repo.
+   Per CLAUDE.md it was reported and not used — and then the operator
+   **explicitly authorised it for that one session**, which is how the
+   migrations above came to be applied. Every call carried
+   `project_id: vockiqvlijtkxvpdttya` and no project was ever enumerated.
 
-The durable fix for 3 is the one CLAUDE.md already names: disconnect the
-Supabase connector in claude.ai settings. Until then every session here is
-one tool call away from the hole the four enforcement layers exist to close,
-and the deny rule in `.claude/settings.json` does not cover the name it
-actually appeared under.
+That authorisation was for one session and does not carry forward. The durable
+fix is still the one CLAUDE.md names: disconnect the Supabase connector in
+claude.ai settings, and note that the deny rule in `.claude/settings.json`
+does not cover the name it actually appeared under (`mcp__Supabase__*`, capital
+S) — worth adding whichever way the connector question is settled.

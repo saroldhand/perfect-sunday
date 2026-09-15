@@ -20,28 +20,29 @@ three waits.
 
 ## ⚠ Do next — operator, high priority
 
-**Catch the database up, then get Week 2 open.** The repo has not moved since
-2026-08-27 and the database has not moved at all; the paused project means the
-gap is now nineteen days wide. The full ordered runbook — state probes first,
-because none of it could be verified from a session without database access —
-is [supabase/CATCHUP.md](../supabase/CATCHUP.md). In short:
+**Get Week 2 open before Thursday 4:00 PM ET.** The schema is now caught up —
+migrations 0013-0017 were applied and verified on 2026-09-15 — but the two
+Edge Functions have never been deployed, nothing is scheduled, and the demo
+week needs a decision. Full runbook and findings:
+[supabase/CATCHUP.md](../supabase/CATCHUP.md). In short:
 
-1. [ ] Run CATCHUP.md's Step 0 probes and read the output before changing
-       anything.
-2. [ ] Apply the outstanding migrations — `0017_sync_scores.sql` at minimum —
-       and run [supabase/tests/scores.sql](../supabase/tests/scores.sql),
-       expecting 21 of 21 PASS.
-3. [ ] **Delete the 2025 demo week.** It is still `open`, and an open week
-       beats everything, so the deployed app showed a 2025 demo slate through
-       the whole opening week. This is the one item that is actively wrong on
-       the live site right now.
-4. [ ] Leave Week 1 `upcoming` — it is inert there, and backfilling it would
-       mean grading against lines nobody was shown. CATCHUP.md Step 3 shows
-       why, and the one way to break it.
-5. [ ] `supabase functions deploy sync-slate sync-scores`, then run
-       `sync-slate` to open Week 2 — **before Thursday 4:00 PM ET.**
-6. [ ] Schedule all four cron jobs. The pause is the argument for automation:
-       a week nobody is watching is a week that does not happen.
+1. [x] Step 0 probes run. The database was at **migration 0012** — five back,
+       not one. The 2026 season had never been loaded: Week 1 and Week 2 did
+       not exist as rows, which is the real reason Week 1 never happened.
+2. [x] Migrations 0013-0017 applied and verified. 0015's 272 games were
+       digest-checked against the repo file rather than eyeballed.
+3. [ ] **Decide the demo week** — no longer a cleanup. It holds **49 picks
+       from 4 real accounts** (three complete sets), so deleting it destroys
+       the only real usage data the product has. CATCHUP.md Step 2 lays out
+       four options; `status = 'upcoming'` keeps the picks and is inert
+       everywhere. Settle it before scheduling cron, which would otherwise
+       lock the demo week on its first tick.
+4. [x] Week 1 left `upcoming`. Confirmed inert against the live database:
+       `next_week_needing_lines()` returns Week 2, skipping it unprompted.
+5. [ ] `supabase functions deploy sync-slate sync-scores` — **neither has
+       ever been deployed**; the project has zero Edge Functions.
+6. [ ] Install `pg_cron` and `pg_net` (neither is present), then schedule the
+       four jobs.
 7. [ ] Watch Thursday's lock and one live `sync-scores` run by hand — the
        ESPN feed's shape is observed, not documented, and comparing `fetched`
        against `updated` is the check that proves it.
