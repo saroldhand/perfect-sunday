@@ -44,5 +44,12 @@ export function selectCurrentWeek(weeks: Week[], now: number): Week | null {
   );
   if (ahead) return ahead;
 
-  return byLock[byLock.length - 1];
+  // Whatever happened most recently — but never a `previous` week. That status
+  // means the week went by without being played (no lines, no picks, nothing
+  // graded), so there is nothing in it to show; handing one to the UI would
+  // put an empty slate on screen and invite every downstream `if` chain to
+  // guess at what it is. Falling through to null instead gives the honest
+  // "no slate is posted yet".
+  const played = byLock.filter((w) => w.status !== "previous");
+  return played.length > 0 ? played[played.length - 1] : null;
 }

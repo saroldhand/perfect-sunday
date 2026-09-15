@@ -1,5 +1,12 @@
 # Running a week by hand
 
+> **2026-09-15 — the database is behind the repo.** The project was paused
+> across the Week 1 opener, so nothing here has been run against production
+> yet. Work [CATCHUP.md](CATCHUP.md) first; it is the one-time runbook that
+> gets the database to a live Week 2. One correction it carries: the demo-week
+> cutover below says mark it `scored`, which was right before the season
+> started and is wrong now — delete it instead, and CATCHUP.md Step 2 says why.
+
 The operator runs three steps from the Supabase SQL editor. All three can now be
 automated instead — `sync-slate` opens a week once its lines land, and `pg_cron`
 can run the lock and grade jobs — but **nothing is scheduled by default**, so
@@ -129,23 +136,40 @@ order by w.week_number;
 
 Open the week only when `missing` is 0. Step 1 below is that step.
 
-### Cutting over from the demo week
+### The demo week is gone
 
-The 2025 Week 18 demo week is still in the database and still `open`, and an
-open week wins over every upcoming one — so until it is closed, the app shows
-the demo rather than the real season. Before Week 1:
+The 2025 Week 18 demo week was deleted on 2026-09-15. Nothing in this document
+needs it any more, and the cutover instructions that used to sit here — mark it
+`scored`, or delete it — are retired along with it. If a demo week is ever
+seeded again (migration 0005), delete it rather than marking it `scored`:
+`getLastScoredWeek` orders by season descending, so a scored week from an old
+season becomes the board's "most recent finished week" until a real one is
+scored.
+
+### `previous`: a week that was never played
+
+Migration 0018 adds a fifth `week_status`. It exists for 2026 Week 1, which
+went by while the project was paused — no lines, no picks, nothing graded — and
+for which none of the other four statuses was true. `upcoming` was the least
+wrong option and was used for a few hours; it is still a lie about a week in
+the past.
 
 ```sql
-update public.weeks set status = 'scored'
-where season = 2025 and week_number = 18;
+update public.weeks set status = 'previous'
+where season = 2026 and week_number = 1;
 ```
 
-`scored` rather than deleted keeps the demo picks and entries as history and
-keeps the leaderboard's "last scored week" fallback with something to show. To
-remove it outright instead, `delete from public.weeks where season = 2025 and
-week_number = 18;` cascades to its games, picks and entries.
+It is terminal: an operator puts a week there, and nothing takes it out. No
+scheduled job can see it, because each selects on the status its own work
+moves a week out of — so there was nothing to change in any of them. The app
+skips it too: `selectCurrentWeek` will not return a `previous` week, which is
+what stops an empty slate reaching the screen.
 
-## 1. Open the week
+Use it for a week that is over and was not played. Do **not** use it to retire
+a week that *was* played — that is what `scored` is for, and a played week's
+result belongs on the board.
+
+## 1. Open the week## 1. Open the week
 
 Picks are writable only while `weeks.status = 'open'` — that is enforced by RLS,
 not by the UI.
@@ -327,10 +351,25 @@ nothing, since it returns `nothing-to-do` when no week needs lines.
 select cron.schedule('sync-slate', '0 * * * *', $$
   select net.http_post(
     url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate',
-    headers := '{"Content-Type":"application/json"}'::jsonb
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'apikey', 'sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb',
+      'Authorization', 'Bearer sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb'
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
   );
 $$);
 ```
+
+**The key headers are not optional.** Both functions are deployed with
+`verify_jwt` on, so a post without them is rejected before the function runs —
+an earlier version of this snippet sent only `Content-Type` and would have
+failed every tick silently, since `net.http_post` returns a request id
+whether or not the call succeeds. The publishable key is the right one to use
+here: it already ships in the browser bundle, so putting it in a cron
+definition leaks nothing, and it keeps the service-role key out of the
+automation exactly as migration 0014 intended.
 
 This needs `pg_net` as well as `pg_cron`. Unschedule with
 `select cron.unschedule('sync-slate');`.
@@ -342,6 +381,41 @@ This needs `pg_net` as well as `pg_cron`. Unschedule with
 - Open a week with any game missing a line.
 - Write a partial line. A game missing any of spread, total, over odds or under
   odds is skipped entirely, leaving the column NULL so the week stays shut.
+
+### It will, however, open a week on top of an already-open one
+
+`next_week_needing_lines()` selects on `status = 'upcoming'`, so the moment a
+week opens it stops being a candidate and the *next* one becomes one. In the
+normal weekly rhythm that is exactly right and never collides: a week is
+`scored` by Monday night, and the next week's lines land on Tuesday, so only
+one week is ever in play.
+
+Out of cadence it collides, and the collision is not benign.
+`selectCurrentWeek` prefers weeks that are `open` or `locked` and, among them,
+takes the **latest** `locks_at` — so a newly opened week hides the one before
+it. If Week N is open and taking picks, and Week N+1's lines land and open it,
+the app jumps to Week N+1 and nobody can finish their Week N picks.
+
+This is live right now: Week 2 opened out of cadence on Tue 15 Sep, and
+`next_week_needing_lines()` already returns Week 3. **That is why `sync-slate`
+is deliberately the one job not scheduled.** Schedule it once Week 2 has
+locked and the sequence is back in step:
+
+```sql
+-- After Week 2 locks. The snippet is under "Scheduling it" above.
+select cron.schedule('sync-slate', '0 * * * *', $$ ... $$);
+```
+
+The durable fix is a product decision rather than a patch, which is why this
+session did not make it. Either `next_week_needing_lines` should decline to
+open a week while an earlier one is still `open`, or `selectCurrentWeek`
+should prefer the *earliest* week in play — which is arguably what its own
+comment already describes ("between Thursday's lock and the last game going
+final, the week the user cares about is the one they are already in"), and
+which would also show a locked Week N rather than an open Week N+1 during
+Sunday's games. The cost of earliest-first is that one week left `locked`
+because a game never went final would pin the app there, which is the case
+the current "latest" rule was written for.
 
 ## sync-scores: pulling the results
 
@@ -407,10 +481,19 @@ to maintain or get wrong on a Thursday, a Saturday, or Christmas morning.
 select cron.schedule('sync-scores', '*/5 * * * *', $$
   select net.http_post(
     url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-scores',
-    headers := '{"Content-Type":"application/json"}'::jsonb
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'apikey', 'sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb',
+      'Authorization', 'Bearer sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb'
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
   );
 $$);
 ```
+
+The key headers are required here too — see the note under sync-slate's
+schedule. This job is already scheduled and running.
 
 Same requirements as sync-slate: `pg_cron` and `pg_net`. Keep
 `score-due-weeks` scheduled as well — grading rides inside
@@ -484,6 +567,22 @@ select cron.schedule('score-due-weeks', '*/10 * * * *',
 `cron.schedule` runs in UTC. Neither job needs a wall-clock time, which is the
 point of selecting by status and `locks_at` — there is no Eastern offset to get
 wrong here, and no DST shift to track.
+
+### Reading what a scheduled run actually did
+
+`net.http_post` hands back a request id immediately and never fails on the
+function's behalf, so a job showing `succeeded` in `cron.job_run_details`
+means the post was *sent*, not that the function worked. The response is the
+thing to read:
+
+```sql
+select r.id, r.status_code, r.error_msg, r.content
+from net._http_response r
+order by r.id desc
+limit 10;
+```
+
+A 401 there means the key headers above are missing from the schedule.
 
 To check and to switch off:
 

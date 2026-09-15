@@ -39,7 +39,15 @@ export default function MyWeek() {
   // `upcoming` is its own state, matching the deck and the hub: a week can have
   // its games seeded before every line is posted, and showing a list of
   // "Not picked" rows against numbers that do not exist yet is a lie.
-  if (!week || week.status === "upcoming" || games.length === 0) {
+  // `previous` joins the guard for the same reason: neither week has a slate
+  // anyone can act on, and without it a past week would render as "Open" with
+  // a lock time that has already gone.
+  if (
+    !week ||
+    week.status === "upcoming" ||
+    week.status === "previous" ||
+    games.length === 0
+  ) {
     return (
       <>
         <Title>Your week</Title>

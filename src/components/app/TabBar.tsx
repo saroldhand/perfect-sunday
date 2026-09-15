@@ -7,6 +7,7 @@ import { useWeek } from "@/components/app/WeekProvider";
 const TABS = [
   { href: "/", label: "Home" },
   { href: "/week", label: "My Week" },
+  { href: "/history", label: "Previous" },
   { href: "/leaderboard", label: "Board" },
 ] as const;
 

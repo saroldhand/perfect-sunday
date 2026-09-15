@@ -1,0 +1,38 @@
+-- A terminal status for a week that came and went without being played.
+--
+-- 2026 Week 1 is the case that forced it. The Supabase project was paused
+-- across the season opener, so Week 1's lines never landed, it never opened,
+-- nobody picked it, and by the time anyone looked its games had all finished.
+-- None of the four existing statuses describes that. It was parked as
+-- `upcoming`, which is inert in every job and invisible to selectCurrentWeek —
+-- the behaviour is right — but it is a lie about a week in the past, and the
+-- two places that documented the workaround both had to apologise for it.
+--
+-- `previous` says the true thing: over, and never played.
+--
+-- It is deliberately a dead end. Nothing moves a week into it but an operator,
+-- and nothing moves a week out of it. Every scheduled job already selects on
+-- the status its own work moves a week out of, so a `previous` week is
+-- untouched by all of them without any of them changing:
+--
+--   lock_due_weeks           status = 'open'
+--   score_due_weeks          status = 'locked'
+--   next_week_needing_lines  status = 'upcoming' and locks_at > now()
+--   next_week_needing_scores status = 'locked'
+--
+-- The RLS policies are the same story: picks are writable only while a game's
+-- week is `open`, and readable by others only once it is `locked` or `scored`,
+-- so a `previous` week's picks are frozen and private to their owner. That is
+-- the correct treatment of a week nobody was ever able to finish.
+--
+-- Not added to the enum's front or given a position, because nothing anywhere
+-- orders by this type — only equality and IN are ever used on it.
+
+alter type public.week_status add value if not exists 'previous';
+
+-- The app side needs care that the database does not: a new enum value falls
+-- through `if` chains written when there were four. hubView would have
+-- rendered a `previous` week as a *scored* result, and My Week would have
+-- rendered it as open and invited picks. Both are handled in the same commit,
+-- and selectCurrentWeek now refuses to hand a `previous` week to the UI at
+-- all, so those are belts rather than the braces.

@@ -98,7 +98,12 @@ export default function Picks() {
   // Waiting-for-lines state. A week stays upcoming until every game on the
   // slate has a complete line, because a number that changes after someone
   // picks against it is a broken promise.
-  if (!week || week.status === "upcoming" || games.length === 0) {
+  if (
+    !week ||
+    week.status === "upcoming" ||
+    week.status === "previous" ||
+    games.length === 0
+  ) {
     return (
       <Shell>
         <h1 className="font-[family-name:var(--font-display)] text-3xl font-bold uppercase tracking-tight">

@@ -78,6 +78,31 @@ describe("selectCurrentWeek", () => {
     expect(selectCurrentWeek(season, Date.parse("2027-02-01T12:00:00Z"))?.week_number).toBe(18);
   });
 
+  it("never returns a week that was never played", () => {
+    // 2026 Week 1 is exactly this: the project was paused across the opener,
+    // so it has no lines and no picks. Showing it would put an empty slate on
+    // screen; null gets the honest "no slate is posted yet" instead.
+    expect(selectCurrentWeek([week(1, SEP, "previous")], OCT)).toBeNull();
+  });
+
+  it("skips a never-played week to reach one that counts", () => {
+    const season = [
+      week(1, SEP, "previous"),
+      week(2, SEP17, "scored"),
+    ];
+    expect(
+      selectCurrentWeek(season, Date.parse("2027-02-01T12:00:00Z"))?.week_number,
+    ).toBe(2);
+  });
+
+  it("prefers a week in play over a never-played one", () => {
+    const season = [
+      week(1, SEP, "previous"),
+      week(2, SEP17, "open"),
+    ];
+    expect(selectCurrentWeek(season, Date.parse("2026-09-15T17:00:00Z"))?.week_number).toBe(2);
+  });
+
   it("takes the newer of two weeks left in play", () => {
     // A week whose last game never went final would otherwise strand the app on
     // it for the rest of the season.
