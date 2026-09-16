@@ -112,31 +112,41 @@ Covers `private.apply_week_lines` and `private.next_week_needing_lines` (0016),
 plus the grants on their `public` wrappers. Fixture weeks 980-982, transaction
 ending in ROLLBACK.
 
-Rewritten for the moneyline payload 2026-09-15. **Not yet run** — run it once
-0019 is applied, the way `scores.sql` was written ahead of 0017. 20 assertions:
+Rewritten for the moneyline payload 2026-09-15. Results as of 2026-09-16, all
+20 passing against the live project with 0019 applied:
 
-| Test | Asserts |
-|---|---|
-| 1 | `next_week_needing_lines` picks the earliest unfilled week |
-| 2 | A partial fill updates the games it has |
-| 3 | A partial fill reports the remaining gap |
-| 4 | A partial fill does **not** open the week |
-| 5 | The week is still `upcoming` after a partial fill |
-| 6 | A one-sided price still counts as missing |
-| 7 | A one-sided price does **not** open the week |
-| 8 | The week is still `upcoming` on a one-sided price |
-| 9 | A complete fill leaves nothing missing |
-| 10 | A complete fill opens the week |
-| 11 | `over_odds` and `under_odds` land in the right columns |
-| 12 | `moneyline_home` and `moneyline_away` land in the right columns |
-| 13 | `line_source` is stored per game |
-| 14 | A locked week accepts no updates |
-| 15 | A locked week's line is unchanged |
-| 16 | A locked week's `line_source` is unchanged |
-| 17 | A filled week drops out of the sync queue |
-| 18 | `anon` cannot execute the line writer |
-| 19 | `authenticated` cannot execute the line writer |
-| 20 | `service_role` can execute the line writer |
+| Test | Asserts | Result |
+|---|---|---|
+| 1 | `next_week_needing_lines` picks the earliest unfilled week | PASS |
+| 2 | A partial fill updates the games it has | PASS |
+| 3 | A partial fill reports the remaining gap | PASS |
+| 4 | A partial fill does **not** open the week | PASS |
+| 5 | The week is still `upcoming` after a partial fill | PASS |
+| 6 | A one-sided price still counts as missing | PASS |
+| 7 | A one-sided price does **not** open the week | PASS |
+| 8 | The week is still `upcoming` on a one-sided price | PASS |
+| 9 | A complete fill leaves nothing missing | PASS |
+| 10 | A complete fill opens the week | PASS |
+| 11 | `over_odds` and `under_odds` land in the right columns | PASS |
+| 12 | `moneyline_home` and `moneyline_away` land in the right columns | PASS |
+| 13 | `line_source` is stored per game | PASS |
+| 14 | A locked week accepts no updates | PASS |
+| 15 | A locked week's line is unchanged | PASS |
+| 16 | A locked week's `line_source` is unchanged | PASS |
+| 17 | A filled week drops out of the sync queue | PASS |
+| 18 | `anon` cannot execute the line writer | PASS |
+| 19 | `authenticated` cannot execute the line writer | PASS |
+| 20 | `service_role` can execute the line writer | PASS |
+
+Test 17 failed on the first run, and the reason is worth keeping. This suite
+runs against the live project, and `next_week_needing_lines()` ranks every
+upcoming unpriced week by `locks_at` — the real season's included. The fixture
+originally locked its two unfilled weeks at +2 and +9 days, which passed in
+August because no real week locked inside that window; by mid-September the
+real Week 3 sat unpriced at +8 days, sorted ahead of the second fixture week,
+and the function returned it — correctly. The fixture now locks its weeks at
++1 and +2 hours. Real weeks lock Thursday 4:00 PM ET, so that window can only
+collide if the suite is run at about 2 PM on a Thursday.
 
 Tests 14-16 are the reason this file exists. Every entry in a locked week was
 graded against the numbers standing at lock; a feed that rewrites one changes

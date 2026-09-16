@@ -7,10 +7,11 @@
 -- feed that rewrites one changes what people were scored on after the fact —
 -- silently, and in the feed's favour rather than anyone's.
 --
--- Rewritten for the moneyline payload 2026-09-15; 20 assertions. NOT YET RUN
--- — run it once 0019 is applied, the way scores.sql was written ahead of 0017.
--- The three new one-sided-price cases are the ones to watch: they are the only
--- assertions covering the term the completeness rule grew in 0019.
+-- Results as of 2026-09-16: 20 of 20 passing, against the live project with
+-- 0019 applied. The first run came back 19 of 20 — the one failure was the
+-- fixture, not the function: its unfilled weeks locked days out, and a real
+-- upcoming week had come to sit inside that window. See the note on the
+-- fixture below; the lock times are now hours out and cannot collide.
 
 begin;
 create temp table results (test text, expected text, actual text, pass boolean) on commit drop;
@@ -18,12 +19,21 @@ create temp table results (test text, expected text, actual text, pass boolean) 
 -- how scoring.sql records its assertions.
 create temp table applied (label text, updated int, missing int, opened boolean) on commit drop;
 
+-- The two unfilled fixture weeks lock within HOURS, not days. This file runs
+-- against the live project, and next_week_needing_lines() orders every
+-- upcoming unpriced week by locks_at — the real season's included. The first
+-- version of this fixture used +2 days and +9 days, which passed in August
+-- because no real week locked inside that window; by mid-September the real
+-- Week 3 sat unpriced at +8 days, sorted ahead of fixture 981, and the "drops
+-- out of the queue" assertion failed on correct behaviour. Real weeks lock
+-- Thursday 4:00 PM ET, so a two-hour window only collides if this is run at
+-- about 2 PM on a Thursday.
 insert into public.weeks (id, season, week_number, locks_at, status)
   overriding system value
 values
-  (980, 2099, 1, now() + interval '2 days', 'upcoming'),  -- the one to fill
-  (981, 2099, 2, now() + interval '9 days', 'upcoming'),  -- later, also unfilled
-  (982, 2099, 3, now() + interval '1 day',  'locked');    -- closed to the feed
+  (980, 2099, 1, now() + interval '1 hour',  'upcoming'),  -- the one to fill
+  (981, 2099, 2, now() + interval '2 hours', 'upcoming'),  -- later, also unfilled
+  (982, 2099, 3, now() + interval '1 day',   'locked');    -- closed to the feed
 
 insert into public.games (week_id, external_id, away_team, home_team, kickoff_at)
 values
