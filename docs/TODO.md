@@ -74,12 +74,13 @@ and §4 below. Full runbook and findings:
        the deck will show 16 games needing their second pick. Nothing is
        scored without a complete set, so an entry only exists after Thursday's
        lock if those 16 go in.
-10. [ ] **Run `supabase/tests/lines.sql`** against the project. It was
-       rewritten for the moneyline payload and its 20 assertions have not been
-       run — the connector dropped before they could be. `scoring.sql`'s 13
-       were run and passed. The three new one-sided-price cases are the ones
-       to watch: they are the only coverage of the term the completeness rule
-       grew in 0019.
+10. [x] **`supabase/tests/lines.sql` run**: 20 of 20, 2026-09-16, including
+       the three one-sided-price cases that are the only coverage of the term
+       the completeness rule grew in 0019. The first run was 19 of 20 and the
+       failure was the fixture's, not the function's — its unfilled weeks
+       locked days out and the real Week 3 had come to sit inside that window.
+       Fixed by locking the fixture weeks hours out; the README explains.
+       Every SQL suite touched by 0019 has now been run against production.
 
 ---
 
