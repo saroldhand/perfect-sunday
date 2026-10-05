@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import { absoluteUrl } from "@/lib/urls";
-import { GOOGLE_AUTH_ENABLED } from "@/lib/constants";
+import { CODE_SIGN_IN_ENABLED, GOOGLE_AUTH_ENABLED } from "@/lib/constants";
+import { FooterLinks } from "@/components/app/FooterLinks";
 import { useWeek } from "@/components/app/WeekProvider";
 import { formatTotal, priceFor } from "@/lib/format";
 
@@ -39,11 +40,23 @@ export function SignInForm() {
         <h1 className="font-[family-name:var(--font-display)] text-4xl font-extrabold uppercase tracking-tight">
           Check your email
         </h1>
-        <p className="mt-3 text-sm text-[var(--color-text-muted)]">
-          We sent a sign-in link to{" "}
-          <span className="text-[var(--color-text)]">{send.email}</span>. Open it
-          on this device and you are in — there is no password to remember.
-        </p>
+        {CODE_SIGN_IN_ENABLED ? (
+          <>
+            <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+              We sent a sign-in link and a code to{" "}
+              <span className="text-[var(--color-text)]">{send.email}</span>.
+              Tap the link, or type the code here — the code works even if the
+              link opens in a different browser.
+            </p>
+            <CodeEntry email={send.email} />
+          </>
+        ) : (
+          <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+            We sent a sign-in link to{" "}
+            <span className="text-[var(--color-text)]">{send.email}</span>. Open
+            it on this device and you are in — there is no password to remember.
+          </p>
+        )}
         <button
           type="button"
           onClick={() => setSend({ status: "idle" })}
@@ -139,7 +152,80 @@ export function SignInForm() {
       <p className="mt-8 text-xs text-[var(--color-text-muted)]">
         No passwords, no deposit, no payment. Free to enter.
       </p>
+      {/* Here rather than only in the hub footer: this is the screen that asks
+          for an email, so it is where what we do with one has to be a tap away. */}
+      <div className="mt-3">
+        <FooterLinks />
+      </div>
     </Shell>
+  );
+}
+
+type VerifyState =
+  | { status: "idle" }
+  | { status: "verifying" }
+  | { status: "error"; message: string };
+
+/**
+ * Sign in by typing the one-time code from the magic-link email, in this
+ * browser, instead of hoping the link opens here. Nothing to route on success:
+ * verifyOtp stores the session, onAuthStateChange flips the hub to signed in,
+ * and the hub's own effect sends a new player on to /welcome.
+ */
+function CodeEntry({ email }: { email: string }) {
+  const [code, setCode] = useState("");
+  const [verify, setVerify] = useState<VerifyState>({ status: "idle" });
+
+  // Six digits is Supabase's default; the project setting allows up to ten,
+  // so the field takes up to ten rather than truncating a longer code.
+  const ready = code.length >= 6;
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!ready) return;
+    setVerify({ status: "verifying" });
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: code,
+      type: "email",
+    });
+    if (error) setVerify({ status: "error", message: error.message });
+  }
+
+  return (
+    <form onSubmit={submit} className="mt-6">
+      <label
+        htmlFor="code"
+        className="block text-xs font-medium uppercase tracking-widest text-[var(--color-text-muted)]"
+      >
+        Code from the email
+      </label>
+      <input
+        id="code"
+        type="text"
+        inputMode="numeric"
+        autoComplete="one-time-code"
+        maxLength={10}
+        value={code}
+        // Digits only, so a code pasted with a stray space still counts.
+        onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+        placeholder="123456"
+        className="tabular mt-2 w-full rounded-[var(--radius-target)] border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-4 text-center text-2xl tracking-[0.3em] text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-accent)]"
+      />
+      <button
+        type="submit"
+        disabled={!ready || verify.status === "verifying"}
+        className="btn btn-gold mt-4"
+      >
+        {verify.status === "verifying" ? "Checking…" : "Sign in"}
+      </button>
+      {verify.status === "error" && (
+        <p className="mt-3 text-sm text-[var(--color-text-muted)]">
+          That code did not work:{" "}
+          <span className="text-[var(--color-text)]">{verify.message}</span>
+        </p>
+      )}
+    </form>
   );
 }
 

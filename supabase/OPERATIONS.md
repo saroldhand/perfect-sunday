@@ -21,6 +21,86 @@
 >    prices, `apply_week_lines` opens it only when nothing is missing. Never
 >    force a week `open` by hand to undo this.
 
+## Is it working? The weekly check-in
+
+Added 2026-10-05, by a session that could not reach the database (see
+docs/TODO.md), so these queries are written against the schema and have not
+yet been run against production. Paste each one into the SQL editor on its own;
+the editor shows only the last statement's result.
+
+**How each week went** — one row per week from the opener to the next lock:
+
+```sql
+select w.week_number,
+       w.status,
+       to_char(w.locks_at at time zone 'America/New_York', 'Dy Mon DD HH12:MI AM') as locks_et,
+       count(g.id)                                              as games,
+       count(g.id) filter (where g.moneyline_home is not null)  as priced,
+       count(g.id) filter (where g.status = 'final')            as final,
+       (select count(distinct p.user_id) from public.picks p
+          join public.games pg on pg.id = p.game_id
+         where pg.week_id = w.id)                               as pickers,
+       (select count(*) from public.entries e where e.week_id = w.id) as entries,
+       (select max(e.correct_count) from public.entries e where e.week_id = w.id) as best,
+       (select count(*) from public.entries e
+         where e.week_id = w.id and e.is_perfect)               as perfect
+from public.weeks w
+left join public.games g on g.week_id = w.id
+where w.season = 2026
+  and w.locks_at <= (select min(locks_at) from public.weeks
+                     where season = 2026 and locks_at > now())
+group by w.id
+order by w.week_number;
+```
+
+A healthy past week reads `scored`, `priced` = `final` = `games`, and
+`entries` close to `pickers` (the gap is people who left their set
+incomplete). The last row is the week coming up, and should be `open` with
+`priced` = `games` by Tuesday night.
+
+**Whether the timers are firing:**
+
+```sql
+select j.jobname, j.schedule, j.active,
+       max(d.start_time) filter (where d.status = 'succeeded') as last_ok,
+       count(*) filter (where d.status = 'failed'
+                          and d.start_time > now() - interval '7 days') as failed_7d
+from cron.job j
+left join cron.job_run_details d on d.jobid = j.jobid
+group by j.jobname, j.schedule, j.active
+order by j.jobname;
+```
+
+Four rows are expected: `lock-due-weeks`, `score-due-weeks`, `sync-scores`,
+and `sync-slate`. For the two that post to Edge Functions, `succeeded` only
+means the request was sent — read `net._http_response` (under "Reading what a
+scheduled run actually did" below) for what the function said.
+
+### If `sync-slate` was never scheduled
+
+As of 2026-09-15 it was deliberately left off until Week 2 locked, and nothing
+in the repo records it being switched on afterwards. If the timers query has
+no `sync-slate` row, every week after Week 2 sat `upcoming` with no lines,
+nobody could pick, and the app showed "no slate posted" throughout. The
+recovery is two steps, and the order does not matter:
+
+```sql
+-- 1. Retire the weeks that came and went without opening, as Week 1 was.
+--    Only `upcoming` weeks whose lock has passed — no picks can exist on
+--    them, because RLS only accepts picks on an `open` week.
+update public.weeks set status = 'previous'
+where season = 2026 and status = 'upcoming' and locks_at < now();
+
+-- 2. Schedule sync-slate: the snippet under "sync-slate: pulling the lines"
+--    below. It is safe now — next_week_needing_lines() skips any week whose
+--    lock has passed, so its first tick goes straight to the next live week.
+```
+
+Then run it once by hand (the `curl` under "Deploying and running it") rather
+than waiting for the top of the hour, and confirm `missing: 0, opened: true`.
+
+## The three manual steps
+
 The operator runs three steps from the Supabase SQL editor. All three can now be
 automated instead — `sync-slate` opens a week once its lines land, and `pg_cron`
 can run the lock and grade jobs — but **nothing is scheduled by default**, so
@@ -194,7 +274,7 @@ Use it for a week that is over and was not played. Do **not** use it to retire
 a week that *was* played — that is what `scored` is for, and a played week's
 result belongs on the board.
 
-## 1. Open the week## 1. Open the week
+## 1. Open the week
 
 Picks are writable only while `weeks.status = 'open'` — that is enforced by RLS,
 not by the UI.
