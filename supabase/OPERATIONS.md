@@ -76,28 +76,81 @@ and `sync-slate`. For the two that post to Edge Functions, `succeeded` only
 means the request was sent — read `net._http_response` (under "Reading what a
 scheduled run actually did" below) for what the function said.
 
-### If `sync-slate` was never scheduled
+### Switching `sync-slate` on
 
 As of 2026-09-15 it was deliberately left off until Week 2 locked, and nothing
 in the repo records it being switched on afterwards. If the timers query has
 no `sync-slate` row, every week after Week 2 sat `upcoming` with no lines,
-nobody could pick, and the app showed "no slate posted" throughout. The
-recovery is two steps, and the order does not matter:
+nobody could pick, and the app showed "no slate posted" throughout.
+
+This block is the whole fix, in one paste. It is safe to run whatever state
+the database is in, and safe to run twice — `cron.schedule` with an existing
+name replaces that job rather than adding a second.
 
 ```sql
--- 1. Retire the weeks that came and went without opening, as Week 1 was.
---    Only `upcoming` weeks whose lock has passed — no picks can exist on
---    them, because RLS only accepts picks on an `open` week.
+-- 1. Retire weeks that came and went without ever opening (no-op if none).
+--    Only `upcoming` weeks whose lock has passed; no picks can exist on them,
+--    because RLS only accepts picks on an `open` week.
 update public.weeks set status = 'previous'
 where season = 2026 and status = 'upcoming' and locks_at < now();
 
--- 2. Schedule sync-slate: the snippet under "sync-slate: pulling the lines"
---    below. It is safe now — next_week_needing_lines() skips any week whose
---    lock has passed, so its first tick goes straight to the next live week.
+-- 2. Schedule sync-slate hourly. It only calls out while no week is open or
+--    locked, so it can never open next week on top of this one.
+select cron.schedule('sync-slate', '0 * * * *', $$
+  select net.http_post(
+    url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'apikey', 'sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb',
+      'Authorization', 'Bearer sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb'
+    ),
+    body := '{}'::jsonb,
+    timeout_milliseconds := 60000
+  )
+  where not exists (
+    select 1 from public.weeks where status in ('open', 'locked')
+  );
+$$);
+
+-- 3. Run it once now instead of waiting for the top of the hour.
+--    One row back = it fired. No rows = a week is open or locked, so the
+--    guard held it back.
+select net.http_post(
+  url := 'https://vockiqvlijtkxvpdttya.supabase.co/functions/v1/sync-slate',
+  headers := jsonb_build_object(
+    'Content-Type', 'application/json',
+    'apikey', 'sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb',
+    'Authorization', 'Bearer sb_publishable_VrGb2daesMaOAJfIpCqLzg_eR-8JMcb'
+  ),
+  body := '{}'::jsonb,
+  timeout_milliseconds := 60000
+)
+where not exists (
+  select 1 from public.weeks where status in ('open', 'locked')
+);
 ```
 
-Then run it once by hand (the `curl` under "Deploying and running it") rather
-than waiting for the top of the hour, and confirm `missing: 0, opened: true`.
+Then, a few seconds later, read what the function said:
+
+```sql
+select status_code, content from net._http_response order by id desc limit 1;
+```
+
+`200` with `"missing":0,"opened":true` means the next week is open and taking
+picks. `missing` above zero means the feed does not have every line yet; the
+hourly job keeps trying. `nothing-to-do` means no week needs lines — usually
+because one is already open, which the check-in query will show.
+
+Step 3 returning no rows is not a failure: some week is already `open` or
+`locked`. If that week is in the past, a game never went final and the week is
+stuck — that blocks the next one opening, by design, until it is scored (see
+"Enter scores and grade" below).
+
+This block was tested on 2026-10-05 against a local Postgres with stubbed
+`cron.schedule` and `net.http_post`: the retire step touched only the stale
+weeks, the job fired with nothing in play, held off with a week open or
+locked, fired again once it was scored, and a second paste left one job. It has
+not yet been run against production.
 
 ## The three manual steps
 
@@ -459,7 +512,8 @@ and the week stays shut — which is the intended outcome, not a failure.
 
 Not scheduled by default, same as the other two. SPEC §5 wants it hourly from
 Tuesday until the slate is complete; hourly year-round is simpler and costs
-nothing, since it returns `nothing-to-do` when no week needs lines.
+nothing — while a week is in play the guard below skips the call entirely, and
+otherwise the function returns `nothing-to-do` when no week needs lines.
 
 ```sql
 select cron.schedule('sync-slate', '0 * * * *', $$
@@ -472,9 +526,17 @@ select cron.schedule('sync-slate', '0 * * * *', $$
     ),
     body := '{}'::jsonb,
     timeout_milliseconds := 60000
+  )
+  where not exists (
+    select 1 from public.weeks where status in ('open', 'locked')
   );
 $$);
 ```
+
+**The `where not exists` is not optional either** — see the next section but
+one for what happens without it. The first-time switch-on, with the stale-week
+cleanup and an immediate run, is the single paste under [Switching `sync-slate`
+on](#switching-sync-slate-on).
 
 **The key headers are not optional.** Both functions are deployed with
 `verify_jwt` on, so a post without them is rejected before the function runs —
@@ -497,40 +559,39 @@ This needs `pg_net` as well as `pg_cron`. Unschedule with
   the over/under odds is skipped entirely, leaving the columns NULL so the week
   stays shut.
 
-### It will, however, open a week on top of an already-open one
+### Left to itself, it will open a week on top of one in play
 
 `next_week_needing_lines()` selects on `status = 'upcoming'`, so the moment a
-week opens it stops being a candidate and the *next* one becomes one. In the
-normal weekly rhythm that is exactly right and never collides: a week is
-`scored` by Monday night, and the next week's lines land on Tuesday, so only
-one week is ever in play.
+week opens it stops being a candidate and the *next* one becomes one. Nothing
+in the function asks whether an earlier week is still in play.
 
-Out of cadence it collides, and the collision is not benign.
-`selectCurrentWeek` prefers weeks that are `open` or `locked` and, among them,
-takes the **latest** `locks_at` — so a newly opened week hides the one before
-it. If Week N is open and taking picks, and Week N+1's lines land and open it,
-the app jumps to Week N+1 and nobody can finish their Week N picks.
+That collision is not benign. `selectCurrentWeek` prefers weeks that are
+`open` or `locked` and, among them, takes the **latest** `locks_at` — so a
+newly opened week hides the one before it. Open Week N+1 while Week N is still
+taking picks and nobody can finish their Week N picks; open it while Week N is
+locked and Sunday's live scores disappear behind a pick screen. Both are
+reachable on an hourly timer whenever the feed carries next week's lines
+early.
 
-This is live right now: Week 2 opened out of cadence on Tue 15 Sep, and
-`next_week_needing_lines()` already returns Week 3. **That is why `sync-slate`
-is deliberately the one job not scheduled.** Schedule it once Week 2 has
-locked and the sequence is back in step:
+**The schedule's `where not exists` guard is the fix, as of 2026-10-05.** The
+job only calls out while no week is `open` or `locked`, which is precisely the
+gap between a week being scored (Monday night) and the next one opening
+(Tuesday) — the rhythm the app was designed around, now enforced rather than
+assumed. Its cost is the one the alternatives had too: a week stuck `locked`
+because a game never went final holds the next week shut until the operator
+scores it. That is visible on the check-in query and is the right thing to
+block on, since a stuck week needs a hand anyway.
 
-```sql
--- After Week 2 locks. The snippet is under "Scheduling it" above.
-select cron.schedule('sync-slate', '0 * * * *', $$ ... $$);
-```
+Two things the guard does not cover:
 
-The durable fix is a product decision rather than a patch, which is why this
-session did not make it. Either `next_week_needing_lines` should decline to
-open a week while an earlier one is still `open`, or `selectCurrentWeek`
-should prefer the *earliest* week in play — which is arguably what its own
-comment already describes ("between Thursday's lock and the last game going
-final, the week the user cares about is the one they are already in"), and
-which would also show a locked Week N rather than an open Week N+1 during
-Sunday's games. The cost of earliest-first is that one week left `locked`
-because a game never went final would pin the app there, which is the case
-the current "latest" rule was written for.
+- **A hand run.** The `curl` above calls the function directly and skips the
+  guard. Before running it by hand, check no week is `open` or `locked`, or
+  pass the `weekId` you mean.
+- **The function itself.** Moving the same check into
+  `next_week_needing_lines()` would protect every caller, at the cost of a
+  migration (the Edge Function asks the database which week to fill, so it
+  would not need redeploying). Worth doing if a second caller ever appears;
+  until then the schedule is the only regular one.
 
 ## sync-scores: pulling the results
 

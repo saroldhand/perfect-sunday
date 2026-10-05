@@ -37,9 +37,13 @@ locks Thursday 8 October at 4:00 PM ET, will not open either.**
       [OPERATIONS.md → "Is it working?"](../supabase/OPERATIONS.md#is-it-working-the-weekly-check-in).
       The first answers items 7 and 9 too: Week 2 should read `scored`, 16 of
       16 `final`, and show your entry.
-- [ ] If the timers query has no `sync-slate` row, do the two-step recovery
-      under it **before Thursday**, then run `sync-slate` once by hand and
-      confirm `missing: 0, opened: true`.
+- [ ] **Switch `sync-slate` on before Thursday** — one paste, under
+      [OPERATIONS.md → "Switching sync-slate on"](../supabase/OPERATIONS.md#switching-sync-slate-on).
+      It retires the stale weeks, schedules the job with a guard so it can
+      never open next week on top of one in play (the hazard item 6 below
+      describes), and runs it once immediately. Safe to paste even if it is
+      already on: the old unguarded job is replaced, not duplicated. Then
+      confirm `missing: 0, opened: true` with the response query beneath it.
 
 ---
 
