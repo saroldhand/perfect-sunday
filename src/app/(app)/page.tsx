@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useWeek } from "@/components/app/WeekProvider";
 import { ShareButton } from "@/components/app/ShareButton";
 import { SignInForm } from "@/components/auth/SignInForm";
+import { FooterLinks } from "@/components/app/FooterLinks";
 import { landingRoute } from "@/lib/profile";
 import { hubView, type HubView, type Verdict } from "@/lib/hub";
 import { isGameComplete } from "@/lib/picks";
@@ -116,12 +117,9 @@ export default function Hub() {
         share={shareTextFor}
         shareResults={shareResultsFor}
       />
-      <Link
-        href="/rules"
-        className="mt-10 block text-xs text-[var(--color-text-muted)] underline underline-offset-4"
-      >
-        Official rules
-      </Link>
+      <div className="mt-10">
+        <FooterLinks />
+      </div>
     </>
   );
 }

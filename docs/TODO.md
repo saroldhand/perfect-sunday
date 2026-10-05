@@ -1,6 +1,6 @@
 # Pre-launch to-do — getting Perfect Sunday ready to share
 
-Written 2026-08-27, **amended 2026-09-15**. The goal is not more features; it
+Written 2026-08-27, **amended 2026-09-15 and 2026-10-05**. The goal is not more features; it
 is that the loop that already exists — pick, share, sweat, compare, return —
 runs without a stumble for someone who arrived from a group text and will not
 give it a second chance.
@@ -18,7 +18,32 @@ three waits.
 
 ---
 
-## ⚠ Do next — operator, high priority
+## ⚠ 2026-10-05 — check the database before anything else
+
+Nothing has changed in the repo since 16 September, and the session that wrote
+this could not see production: the cloud container's network policy refuses
+`vockiqvlijtkxvpdttya.supabase.co`, and the pinned `supabase` MCP server in
+`.mcp.json` launches through Windows `cmd /c`, which does not exist on a Linux
+container. So **how Weeks 2-4 actually went is unknown**, and so are items 7
+and 9 below.
+
+The one thing that could have gone quietly wrong: `sync-slate` was left off the
+schedule on purpose until Week 2 locked (item 6), and nothing records it being
+switched on afterwards. If it never was, Weeks 3 and 4 never opened — no lines,
+no picks, a "no slate posted" screen for a fortnight — and **Week 5, which
+locks Thursday 8 October at 4:00 PM ET, will not open either.**
+
+- [ ] Run the two check-in queries in
+      [OPERATIONS.md → "Is it working?"](../supabase/OPERATIONS.md#is-it-working-the-weekly-check-in).
+      The first answers items 7 and 9 too: Week 2 should read `scored`, 16 of
+      16 `final`, and show your entry.
+- [ ] If the timers query has no `sync-slate` row, do the two-step recovery
+      under it **before Thursday**, then run `sync-slate` once by hand and
+      confirm `missing: 0, opened: true`.
+
+---
+
+## ⚠ Do next — operator, high priority (written 2026-09-15)
 
 **Week 2 is open.** As of 2026-09-15 the database is caught up, both Edge
 Functions are deployed, and locking and scoring are on a timer. What is left
@@ -160,8 +185,17 @@ The robust fix is the 6-digit code: `signInWithOtp` already sends one in
 `{{ .Token }}`, and `verifyOtp({ email, token, type: "email" })` completes
 sign-in **in the app the user is already in** — no browser hop at all.
 
-- [ ] On the "Check your email" state, add a code field: "or type the 6-digit
+- [x] On the "Check your email" state, add a code field: "or type the 6-digit
       code from the email." Keep the link for desktop, where it works well.
+      **Built 2026-10-05, switched off** behind `CODE_SIGN_IN_ENABLED` in
+      `src/lib/constants.ts`, the same way the Google button is: the stock
+      email carries no code, so the field would ask for something nobody has.
+      Exercised against stubbed auth (paste with spaces, verify call, error
+      state). **Operator, to switch it on:** add `{{ .Token }}` to the Magic
+      Link template (Dashboard → Auth → Email Templates), send yourself one and
+      see the code arrive, then flip the constant. If the dashboard will not
+      let you edit templates until custom SMTP is set up, this waits on the
+      chain above.
 
 This is the single biggest smoothness fix available for onboarding. (Google
 OAuth stays deferred per CLAUDE.md — the code path removes most of the pain
@@ -258,26 +292,43 @@ Both need fixing; neither is large:
 
 ## 4. Small blockers before the link goes out
 
-- [ ] **Privacy policy.** We collect email addresses and there is no privacy
+- [x] **Privacy policy.** We collect email addresses and there is no privacy
       page. One static page in the rules' style — what's collected (email,
       display name, picks), what it's for, that it's never sold, how to get
       deleted — linked in the footer next to Official Rules. Required before
       asking strangers-of-friends for their email.
-- [ ] **Decide the prize number for real.** The share text and the rules both
+      **Done 2026-10-05** at `/privacy/`, linked from the sign-in screen (the
+      one that asks for the email) and the hub footer. Every claim was checked
+      against the build and the schema. Deletion is "ask whoever invited you",
+      by the operator's choice — honest only while every player came in through
+      someone the operator knows, so it needs a real contact before the link
+      goes anywhere public.
+- [x] **Decide the prize number for real.** The share text and the rules both
       promise "$1,000". That promise goes out in the very first share. If the
       operator isn't genuinely prepared to pay it during the friends phase,
       lower it *now* — changing it after people have played a week is far
-      worse than a smaller number. (It's a constant by design; one line.)
+      worse than a smaller number.
+      **Decided 2026-10-05: it stays $1,000.** Correction to the line above: it
+      was never a single constant. If it ever changes, it lives in
+      `src/app/rules/page.tsx` (twice, plus the three-way split),
+      `src/lib/share.ts`, the unfurl text in `src/app/layout.tsx`, and the
+      rendered `public/og.png`.
 - [ ] **Auth URL configuration check.** Dashboard → Auth → URL Configuration:
       Site URL `https://saroldhand.github.io/perfect-sunday/` and the redirect
       allowlist covering `/auth/callback/` — and both revisited the day the
       custom domain cuts over, or every magic link breaks at once.
-- [ ] **Link unfurl.** The share URL currently unfurls bare — `layout.tsx` has
+- [x] **Link unfurl.** The share URL currently unfurls bare — `layout.tsx` has
       no Open Graph tags. iMessage and WhatsApp render OG cards; a dark card
       with the wordmark and "Free NFL pick'em — a perfect week wins $1,000" is
       the difference between a link that looks like a product and one that
       looks like a phishing test. `metadata.openGraph` + one static 1200×630
       image. Small, high leverage.
+      **Done 2026-10-05.** Open Graph and Twitter tags with absolute URLs built
+      from `SHARE_DOMAIN`, so they follow a domain purchase with no edit, and
+      `public/og.png` — the wordmark on the night palette over a row of sixteen
+      green squares, laid out centred so a messenger's square crop keeps it.
+      iMessage caches unfurls hard: if a link was already shared bare, a new
+      one may take a while to pick the card up.
 
 ---
 
@@ -349,6 +400,20 @@ Held per the no-feature-bloat principle; revisit only when reality demands:
 - [ ] **Backups & advisors.** Confirm the Supabase plan's backup story before
       real users' picks exist, and run the dashboard's security/performance
       advisors once against the final schema.
+- [ ] **Let cloud sessions see the database.** Two separate blocks, found
+      2026-10-05. The cloud environment's network policy denies
+      `vockiqvlijtkxvpdttya.supabase.co` (environment settings → Network
+      access → add it under Allowed domains); and `.mcp.json` starts the
+      pinned server with `cmd /c npx ...`, which works only on Windows. The
+      first alone is enough for a session to read what the public site reads
+      (weeks, games, entries, display names) with the publishable key; the MCP
+      server would also need an access token in the environment.
+- [ ] **Disconnect the claude.ai Supabase connector.** CLAUDE.md's known gap
+      happened: on 2026-10-05 it was present in the session as
+      `mcp__Supabase__*`, unpinned (it exposes `list_projects` and
+      `create_project`), and the UUID-named deny rule in
+      `.claude/settings.json` did not match it. It was not used. Disconnecting
+      it in claude.ai is the durable fix CLAUDE.md already names.
 
 ---
 
@@ -357,9 +422,10 @@ Held per the no-feature-bloat principle; revisit only when reality demands:
 | # | Item | Size | When |
 |---|---|---|---|
 | 1 | Domain + SMTP + template + rate limits (§1) | M | This week |
-| 2 | Code-entry sign-in (§1) | S–M | This week |
+| 0 | Run the check-in queries; schedule sync-slate if it is missing (top of page) | S | Before Thu 8 Oct |
+| 2 | Code-entry sign-in (§1) | S–M | Built 2026-10-05; operator: template + flag |
 | 3 | Schedule the three jobs + deploy sync-slate (§2) | S | This week |
-| 4 | Privacy page, prize decision, OG tags, URL config (§4) | S each | This week |
+| 4 | ~~Privacy page, prize decision, OG tags~~, URL config (§4) | S each | Three done 2026-10-05; URL config is the operator's |
 | 5 | ~~Client auto-refresh (§3)~~ | S | Done 2026-08-27 |
 | 6 | ~~`sync-scores` (§3)~~ | M | Built 2026-08-27; operator: apply 0017, deploy, schedule |
 | 7 | Demo cutover + Week 1 lines + invite copy (§2) | S | Sep 8–9 |
